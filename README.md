@@ -20,7 +20,7 @@ Urunlerde kritik stok esigi ayarlanabilir (varsayilan 5); bu esik ve altindaki u
 
 ## Kurulum ve guncelleme
 
-Kurulum dosyasi `setup-output/SATISCIM-Setup-1.0.1.exe` konumundadir. Uygulama Windows x64 icin self-contained yayinlanir; kullanicinin bilgisayarinda ayrica .NET Runtime kurulu olmasi gerekmez. Yeni setup ayni `AppId` ile derlendigi icin eski uygulamanin uzerine guncelleme yapar; kullanici veritabani `AppData\Local\SatisTakip` altinda kaldigi icin silinmez.
+Kurulum dosyasi [GitHub Releases](https://github.com/maholinka3131/SATISCIMV2.1/releases/latest) sayfasindan indirilebilir. Uygulama Windows x64 icin self-contained yayinlanir; kullanicinin bilgisayarinda ayrica .NET Runtime kurulu olmasi gerekmez. Yeni setup ayni `AppId` ile derlendigi icin eski uygulamanin uzerine guncelleme yapar; kullanici veritabani `AppData\Local\SatisTakip` altinda kaldigi icin silinmez.
 
 Uygulama acilisinda GitHub'daki `update.json` dosyasini kontrol eder. Daha yeni bir surum varsa indirme baglantisinin acilmasi icin kullanicidan onay ister; indirilen setup calistirilarak guncelleme tamamlanir.
 
