@@ -1,0 +1,357 @@
+﻿<Window x:Class="SatisTakip.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="SATIŞÇIM | Kasa" Height="900" Width="1280"
+        MinHeight="720" MinWidth="1000" Background="#F2F5F7"
+        FontFamily="Segoe UI" WindowStartupLocation="CenterScreen" Loaded="MainWindow_Loaded">
+    <Window.Resources>
+        <SolidColorBrush x:Key="Ink" Color="#1D2939" />
+        <SolidColorBrush x:Key="Muted" Color="#667085" />
+        <SolidColorBrush x:Key="Accent" Color="#176B87" />
+        <SolidColorBrush x:Key="AccentLight" Color="#E2F3F7" />
+        <SolidColorBrush x:Key="Panel" Color="#FFFFFF" />
+        <DropShadowEffect x:Key="CardShadow" Color="#172B3A" Opacity="0.07" BlurRadius="22" ShadowDepth="4" />
+        <Style x:Key="RoundedButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.88" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.76" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="NavButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#D4E8EE" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="15,11" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="0,2" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="NavBorder" Background="{TemplateBinding Background}" CornerRadius="9" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="NavBorder" Property="Background" Value="#1D6174" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="NavBorder" Property="Background" Value="#2A7890" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="Foreground" Value="White" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ProductButton" TargetType="Button">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="Foreground" Value="#1D2939" />
+            <Setter Property="BorderBrush" Value="#E4E7EC" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E2F3F7" />
+                    <Setter Property="BorderBrush" Value="#176B87" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CartColumnHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#F8FAFC" />
+            <Setter Property="Foreground" Value="#667085" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="8,11" />
+            <Setter Property="BorderBrush" Value="#EAECF0" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+        <Style x:Key="CartRow" TargetType="DataGridRow">
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Background" Value="White" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#E2F3F7" />
+                    <Setter Property="Foreground" Value="#123C4A" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CartCell" TargetType="DataGridCell">
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#E2F3F7" />
+                    <Setter Property="Foreground" Value="#123C4A" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="236" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#0D2B37" Offset="0" />
+                    <GradientStop Color="#123C4A" Offset="0.58" />
+                    <GradientStop Color="#176B87" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+            <DockPanel Margin="18,22">
+                <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                        <Border Width="42" Height="42" CornerRadius="12" Background="#F4B860" Margin="0,0,10,0">
+                            <TextBlock Text="S" Foreground="#123C4A" FontSize="27" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="SATIŞÇIM" Foreground="White" FontSize="24" FontWeight="Bold" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Text="SATIŞ  •  STOK  •  KASA" Foreground="#9AC2CC" FontSize="10" FontWeight="SemiBold" Margin="2,6,0,27" />
+                    <Button Content="▣   Kasa" Style="{StaticResource NavButton}" Background="#1D6174" Foreground="White" />
+                    <Button x:Name="ProductsNavButton" Content="□   Ürünler" Style="{StaticResource NavButton}" Click="ProductsButton_Click" />
+                    <Button x:Name="StockEntryNavButton" Content="＋   Stok girişi (barkod)" Style="{StaticResource NavButton}" Click="StockEntryButton_Click" />
+                    <Button x:Name="StockAlertsNavButton" Content="⚠   Kritik stok" Style="{StaticResource NavButton}" Click="StockAlertsButton_Click" />
+                    <Button x:Name="StockMovementsNavButton" Content="↔   Stok hareketleri" Style="{StaticResource NavButton}" Click="StockMovementsButton_Click" />
+                    <Button x:Name="ImportExcelNavButton" Content="↥   Excel'den Aktar" Style="{StaticResource NavButton}" Click="ImportExcelButton_Click" />
+                    <Button x:Name="ExpensesNavButton" Content="₺   Gelir-Gider" Style="{StaticResource NavButton}" Click="AddExpenseButton_Click" />
+                    <Button Content="♙   Müşteriler / Veresiye" Style="{StaticResource NavButton}" Click="CustomersButton_Click" />
+                    <Button x:Name="SalesHistoryNavButton" Content="▤   Satış Geçmişi" Style="{StaticResource NavButton}" Click="SalesHistoryButton_Click" />
+                    <Button x:Name="ReportsNavButton" Content="▤   Satış Raporları" Style="{StaticResource NavButton}" Click="ReportsButton_Click" />
+                    <Button x:Name="DayEndNavButton" Content="▤   Gün Sonu Raporu" Style="{StaticResource NavButton}" Click="DayEndButton_Click" />
+                    <Button x:Name="BackupNavButton" Content="⤓   Veritabanı Yedekle" Style="{StaticResource NavButton}" Click="BackupButton_Click" />
+                    <Button x:Name="RestoreNavButton" Content="⤒   Yedekten Geri Yükle" Style="{StaticResource NavButton}" Click="RestoreButton_Click" />
+                    <Button x:Name="UserManagementNavButton" Content="♙   Kullanıcı yönetimi" Style="{StaticResource NavButton}" Click="UserManagementButton_Click" />
+                    <Button x:Name="AdminSettingsNavButton" Content="⚙   Yönetici Ayarları" Style="{StaticResource NavButton}" Click="AdminSettingsButton_Click" />
+                </StackPanel>
+                </ScrollViewer>
+                <StackPanel x:Name="FinancialSummaryPanel" DockPanel.Dock="Bottom" Margin="0,14,0,0">
+                    <Border Background="#173F4D" BorderBrush="#35616C" BorderThickness="1" CornerRadius="13" Padding="15">
+                        <StackPanel>
+                            <TextBlock Text="BUGÜN" Foreground="#9AC2CC" FontSize="11" FontWeight="SemiBold" />
+                            <TextBlock x:Name="TodaySalesText" Text="0,00 TL" Foreground="White" FontSize="21" FontWeight="Bold" Margin="0,5,0,0" />
+                            <TextBlock Text="Satış özeti" Foreground="#9AC2CC" FontSize="11" Margin="0,3,0,0" />
+                            <TextBlock Text="Gider" Foreground="#9AC2CC" FontSize="10" Margin="0,14,0,0" />
+                            <TextBlock x:Name="TodayExpenseText" Text="0,00 TL" Foreground="White" FontSize="15" FontWeight="SemiBold" Margin="0,3,0,0" />
+                            <TextBlock Text="Net kâr" Foreground="#9AC2CC" FontSize="10" Margin="0,10,0,0" />
+                            <TextBlock x:Name="TodayProfitText" Text="0,00 TL" Foreground="#A9E6C2" FontSize="15" FontWeight="SemiBold" Margin="0,3,0,0" />
+                            <TextBlock Text="Başlangıç kasası" Foreground="#9AC2CC" FontSize="10" Margin="0,10,0,0" />
+                            <TextBlock x:Name="OpeningCashSummaryText" Text="0,00 TL" Foreground="White" FontSize="15" FontWeight="SemiBold" Margin="0,3,0,0" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="30,22,30,26">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0" Margin="0,0,0,18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="SATIŞ NOKTASI" FontSize="10" FontWeight="Bold" Foreground="{StaticResource Accent}" />
+                        <TextBlock Text="Kasa" FontSize="30" FontWeight="Bold" Foreground="{StaticResource Ink}" Margin="0,2,0,0" />
+                        <TextBlock Text="Ürün seçin, miktarı belirleyin ve satışı tamamlayın." Foreground="{StaticResource Muted}" FontSize="13" Margin="0,3,0,0" />
+                    </StackPanel>
+                    <Button x:Name="AddProductTopButton" Grid.Column="1" Content="＋  Yeni ürün" Click="AddProductButton_Click" Style="{StaticResource RoundedButton}" Background="{StaticResource Accent}" Foreground="White" BorderThickness="0" Padding="17,11" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                </Grid>
+                <WrapPanel Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,14,0,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock Text="Gün başlangıç kasası" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,0" FontSize="12" />
+                        <TextBox x:Name="OpeningCashBox" Text="0,00" Width="82" Padding="9,7" VerticalContentAlignment="Center" BorderBrush="#D0D5DD" Background="White" />
+                    </StackPanel>
+                    <Button x:Name="StartDayButton" Content="Günü başlat" Click="StartDayButton_Click" Style="{StaticResource RoundedButton}" Background="#E2F3F7" Foreground="{StaticResource Accent}" BorderBrush="#CBE4E9" Padding="13,9" Margin="0,0,8,0" />
+                    <Button x:Name="AddExpenseTopButton" Content="＋ Gider ekle" Click="AddExpenseButton_Click" Style="{StaticResource RoundedButton}" Background="#FFF4E5" Foreground="#B54708" BorderBrush="#F5D6A4" Padding="14,9" Margin="0,0,8,0" />
+                    <Button x:Name="DayEndTopButton" Content="▤ Gün sonu" Click="DayEndButton_Click" Style="{StaticResource RoundedButton}" Background="#F0F7F8" Foreground="{StaticResource Accent}" BorderBrush="#CBE4E9" Padding="14,9" />
+                </WrapPanel>
+            </Grid>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.5*" />
+                    <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="{StaticResource Panel}" BorderBrush="#E8EDF1" BorderThickness="1" CornerRadius="16" Padding="22" Margin="0,0,18,0" Effect="{StaticResource CardShadow}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid Grid.Row="0">
+                            <StackPanel>
+                                <TextBlock Text="Ürün kataloğu" FontSize="18" FontWeight="Bold" Foreground="{StaticResource Ink}" />
+                                <TextBlock Text="Hızlı erişim ve barkodla ürün ekleme" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,3,0,0" />
+                            </StackPanel>
+                            <Border HorizontalAlignment="Right" VerticalAlignment="Center" Background="#F2F8FA" BorderBrush="#D5E9EE" BorderThickness="1" CornerRadius="12" Padding="10,5">
+                                <TextBlock x:Name="ProductCountText" Text="0 ürün" Foreground="{StaticResource Accent}" FontSize="11" FontWeight="SemiBold" />
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Row="1" Margin="0,16,0,18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" BorderBrush="#D0D5DD" BorderThickness="1" CornerRadius="10" Padding="13,0" Background="#FAFCFD" Height="48">
+                                <DockPanel>
+                                    <TextBlock Text="⌕" FontSize="20" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBox x:Name="SearchBox" BorderThickness="0" Background="Transparent" FontSize="14" VerticalContentAlignment="Center" Padding="0,10" TextChanged="SearchBox_TextChanged" KeyDown="SearchBox_KeyDown" ToolTip="Ürün ara veya barkod okut" />
+                                </DockPanel>
+                            </Border>
+                            <Button Grid.Column="1" Content="↥  Excel" Margin="12,0,0,0" Padding="15,0" Click="ImportExcelButton_Click" Style="{StaticResource RoundedButton}" Background="#F0F7F8" Foreground="{StaticResource Accent}" BorderBrush="#CBE4E9" />
+                        </Grid>
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="ProductButtons" HorizontalContentAlignment="Stretch">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource ProductButton}" Tag="{Binding}" Click="ProductButton_Click" Width="154" Height="86">
+                                            <Button.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Ürünü düzenle" Click="EditProductMenuItem_Click" />
+                                                    <MenuItem Header="Ürünü katalogdan sil" Click="DeleteProductMenuItem_Click" />
+                                                </ContextMenu>
+                                            </Button.ContextMenu>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" FontWeight="SemiBold" MaxHeight="38" />
+                                                <TextBlock Text="{Binding PriceText}" Foreground="{StaticResource Accent}" TextAlignment="Center" FontWeight="Bold" Margin="0,7,0,0" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Background="{StaticResource Panel}" BorderBrush="#E8EDF1" BorderThickness="1" CornerRadius="16" Padding="22" Effect="{StaticResource CardShadow}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid Grid.Row="0" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="Alışveriş sepeti" FontSize="18" FontWeight="Bold" Foreground="{StaticResource Ink}" />
+                                <TextBlock Text="Satışa hazır ürünler" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,3,0,0" />
+                            </StackPanel>
+                            <Button Content="Sepeti sıfırla" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ClearCartButton_Click" Background="Transparent" BorderThickness="0" Foreground="#C2413A" FontSize="11" Cursor="Hand" />
+                        </Grid>
+                        <DataGrid x:Name="CartGrid" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="None" BorderThickness="0" Background="White" AlternationCount="2" AlternatingRowBackground="#FAFCFD" ColumnHeaderStyle="{StaticResource CartColumnHeader}" RowStyle="{StaticResource CartRow}" CellStyle="{StaticResource CartCell}" SelectionChanged="CartGrid_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Ürün" Binding="{Binding Name}" Width="*" />
+                                <DataGridTextColumn Header="Adet" Binding="{Binding Quantity}" Width="55" />
+                                <DataGridTextColumn Header="Tutar" Binding="{Binding LineTotal, StringFormat={}{0:N2} TL}" Width="85" />
+                                <DataGridTemplateColumn Header="" Width="38">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="×" Tag="{Binding}" Click="RemoveCartItemButton_Click" Foreground="#C2413A" Background="Transparent" BorderThickness="0" FontSize="17" ToolTip="Ürünü sepetten sil" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Border Grid.Row="2" Background="#F7F9FA" BorderBrush="#EAECF0" BorderThickness="1" CornerRadius="12" Padding="14" Margin="0,16,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Seçili ürün adedi" Foreground="{StaticResource Muted}" FontSize="12" />
+                                    <TextBlock x:Name="SelectedProductText" Text="Bir ürün seçin" Foreground="{StaticResource Ink}" FontWeight="SemiBold" Margin="0,4,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="−" Width="34" Height="34" Click="DecreaseQuantityButton_Click" Background="White" BorderBrush="#D0D5DD" />
+                                    <TextBlock x:Name="QuantityText" Text="1" Width="34" TextAlignment="Center" VerticalAlignment="Center" FontSize="17" FontWeight="Bold" />
+                                    <Button Content="＋" Width="34" Height="34" Click="IncreaseQuantityButton_Click" Background="{StaticResource AccentLight}" BorderBrush="#CBE4E9" Foreground="{StaticResource Accent}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <StackPanel Grid.Row="3">
+                            <Border Background="#123C4A" CornerRadius="12" Padding="16,13" Margin="0,0,0,14">
+                                <Grid>
+                                    <StackPanel>
+                                        <TextBlock Text="GENEL TOPLAM" FontSize="10" FontWeight="SemiBold" Foreground="#9AC2CC" />
+                                        <TextBlock Text="Ödeme tutarı" FontSize="12" Foreground="#D4E8EE" Margin="0,3,0,0" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="TotalText" Text="0,00 TL" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="25" FontWeight="Bold" Foreground="White" />
+                                </Grid>
+                            </Border>
+                            <TextBlock Text="Ödeme yöntemi" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,8" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="Nakit  ₺" Tag="Nakit" Height="48" Click="PaymentButton_Click" Style="{StaticResource RoundedButton}" Background="#E2F3F7" Foreground="{StaticResource Accent}" BorderBrush="#B9DDE5" FontSize="14" Margin="0,0,5,0" />
+                                <Button Grid.Column="1" Content="Kart  ▣" Tag="Kart" Height="48" Click="PaymentButton_Click" Style="{StaticResource RoundedButton}" Background="{StaticResource Accent}" Foreground="White" BorderThickness="0" FontSize="14" Margin="5,0,0,0" />
+                                <Button Grid.Column="2" Content="Veresiye" Tag="Veresiye" Height="48" Click="PaymentButton_Click" Style="{StaticResource RoundedButton}" Background="#FFF4E5" Foreground="#B54708" BorderBrush="#F5D6A4" FontSize="13" Margin="5,0,0,0" />
+                                <Button Grid.Column="3" Content="Karma" Tag="Karma" Height="48" Click="PaymentButton_Click" Style="{StaticResource RoundedButton}" Background="#EEF4FF" Foreground="#175CD3" BorderBrush="#B2CCFF" FontSize="14" Padding="6,0" Margin="5,0,0,0" />
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>
