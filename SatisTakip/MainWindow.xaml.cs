@@ -46,6 +46,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        VersionText.Text = $"Sürüm {Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "Bilinmiyor"}";
         barcodeScanTimer.Tick += BarcodeScanTimer_Tick;
         database = new DatabaseService();
         ConfigurePermissions();

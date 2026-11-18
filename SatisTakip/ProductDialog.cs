@@ -18,7 +18,7 @@ public sealed class ProductDialog : Window
 
     public Product? Product { get; private set; }
 
-    public ProductDialog(Product? product = null)
+    public ProductDialog(Product? product = null, string? initialBarcode = null)
     {
         originalBarcode = product?.Barcode ?? "";
         Title = product is null ? "Yeni ürün" : "Ürünü düzenle";
@@ -51,6 +51,7 @@ public sealed class ProductDialog : Window
         }
         else
         {
+            barcodeBox.Text = initialBarcode?.Trim() ?? "";
             stockBox.Text = "0";
             minimumStockBox.Text = "5";
         }
@@ -66,7 +67,7 @@ public sealed class ProductDialog : Window
         Content = panel;
         if (product is null)
         {
-            Loaded += (_, _) => barcodeBox.Focus();
+            Loaded += (_, _) => (string.IsNullOrWhiteSpace(initialBarcode) ? barcodeBox : nameBox).Focus();
         }
     }
 

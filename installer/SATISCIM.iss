@@ -1,7 +1,10 @@
 #define MyAppName "SATIŞÇIM"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "SATIŞÇIM"
 #define MyAppExeName "SATISCIM.exe"
+#ifndef PublishDir
+  #define PublishDir "..\publish"
+#endif
 
 [Setup]
 AppId={{B7C9D4EA-5D88-4F2A-9C8D-4E0B2D8A6A11}
@@ -19,7 +22,7 @@ PrivilegesRequired=admin
 UninstallDisplayName={#MyAppName}
 
 [Files]
-Source: "..\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
