@@ -36,7 +36,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var result = MessageBox.Show($"Yeni SATIŞÇIM sürümü bulundu: {update.Version}\n\n{update.Notes}\n\nGüncelleme sayfası açılsın mı?", "Güncelleme bulundu", MessageBoxButton.YesNo, MessageBoxImage.Information);
+        var result = MessageBox.Show($"Yeni SATIŞÇIM sürümü bulundu: {update.Version}\n\n{update.Notes}\n\nYeni sürüm indirilsin mi?\n\nMevcut kayıtlarınız korunacaktır.", "Güncelleme bulundu", MessageBoxButton.YesNo, MessageBoxImage.Information);
         if (result == MessageBoxResult.Yes)
         {
             UpdateService.OpenInstaller(update.DownloadUrl);
