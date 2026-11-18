@@ -29,11 +29,6 @@ public static class BarcodeLabelPrinter
         }
 
         var printDialog = new PrintDialog();
-        if (printDialog.ShowDialog() != true)
-        {
-            return;
-        }
-
         try
         {
             var pageWidth = 50 * DipsPerMillimeter;
@@ -56,6 +51,16 @@ public static class BarcodeLabelPrinter
                 document.Pages.Add(pageContent);
             }
 
+            if (!ShowPreview(copies.Value, product, owner))
+            {
+                return;
+            }
+
+            if (printDialog.ShowDialog() != true)
+            {
+                return;
+            }
+
             printDialog.PrintDocument(document.DocumentPaginator, $"Barkod etiketi - {product.Name}");
         }
         catch (PrintSystemException exception)
@@ -66,6 +71,77 @@ public static class BarcodeLabelPrinter
         {
             MessageBox.Show($"Etiket yazdırılamadı.\n{exception.Message}", "Yazdırma hatası", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private static bool ShowPreview(int copies, Product product, Window owner)
+    {
+        var window = new Window
+        {
+            Title = $"Barkod etiketi ön izleme - {product.Name}",
+            Owner = owner,
+            Width = 900,
+            Height = 720,
+            MinWidth = 640,
+            MinHeight = 480,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+
+        var layout = new DockPanel { Margin = new Thickness(14) };
+        var footer = new Grid { Margin = new Thickness(0, 12, 0, 0) };
+        footer.ColumnDefinitions.Add(new ColumnDefinition());
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var summary = new TextBlock
+        {
+            Text = $"{product.Name}  •  {copies} etiket  •  50 × 30 mm",
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        footer.Children.Add(summary);
+
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var cancelButton = new Button { Content = "Vazgeç", Padding = new Thickness(14, 8, 14, 8), Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
+        cancelButton.Click += (_, _) => window.DialogResult = false;
+        var printButton = new Button { Content = "Yazdır", Padding = new Thickness(14, 8, 14, 8), IsDefault = true };
+        printButton.Click += (_, _) => window.DialogResult = true;
+        buttons.Children.Add(cancelButton);
+        buttons.Children.Add(printButton);
+        Grid.SetColumn(buttons, 1);
+        footer.Children.Add(buttons);
+
+        var previewPage = new Grid
+        {
+            Width = 320,
+            Height = 192,
+            Background = Brushes.White,
+            ClipToBounds = true
+        };
+        previewPage.Children.Add(CreateLabel(product, 320, 192));
+        var previewBorder = new Border
+        {
+            Child = previewPage,
+            BorderBrush = Brushes.LightGray,
+            BorderThickness = new Thickness(1),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(20),
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                BlurRadius = 12,
+                ShadowDepth = 2,
+                Opacity = 0.25
+            }
+        };
+        var previewScroll = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = previewBorder
+        };
+        DockPanel.SetDock(footer, Dock.Bottom);
+        layout.Children.Add(footer);
+        layout.Children.Add(previewScroll);
+        window.Content = layout;
+        return window.ShowDialog() == true;
     }
 
     private static int? AskForCopies(Window owner)

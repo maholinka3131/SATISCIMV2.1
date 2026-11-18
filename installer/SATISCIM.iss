@@ -1,5 +1,5 @@
 #define MyAppName "SATIŞÇIM"
-#define MyAppVersion "1.0.3"
+#define MyAppVersion "1.0.4"
 #define MyAppPublisher "SATIŞÇIM"
 #define MyAppExeName "SATISCIM.exe"
 #ifndef PublishDir

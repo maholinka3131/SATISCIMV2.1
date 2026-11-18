@@ -150,7 +150,8 @@
                         </Border>
                         <TextBlock Text="SATIŞÇIM" Foreground="White" FontSize="24" FontWeight="Bold" VerticalAlignment="Center" />
                     </StackPanel>
-                    <TextBlock Text="SATIŞ  •  STOK  •  KASA" Foreground="#9AC2CC" FontSize="10" FontWeight="SemiBold" Margin="2,6,0,27" />
+                    <TextBlock Text="SATIŞ  •  STOK  •  KASA" Foreground="#9AC2CC" FontSize="10" FontWeight="SemiBold" Margin="2,6,0,2" />
+                    <TextBlock x:Name="VersionText" Foreground="#9AC2CC" FontSize="10" Margin="2,0,0,27" />
                     <Button Content="▣   Kasa" Style="{StaticResource NavButton}" Background="#1D6174" Foreground="White" />
                     <Button x:Name="ProductsNavButton" Content="□   Ürünler" Style="{StaticResource NavButton}" Click="ProductsButton_Click" />
                     <Button x:Name="StockEntryNavButton" Content="＋   Stok girişi (barkod)" Style="{StaticResource NavButton}" Click="StockEntryButton_Click" />
@@ -183,7 +184,6 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
-                <TextBlock x:Name="VersionText" DockPanel.Dock="Bottom" Foreground="#9AC2CC" FontSize="11" Margin="2,12,0,0" />
             </DockPanel>
         </Border>
 
