@@ -1,5 +1,5 @@
 #define MyAppName "SATIŞÇIM"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "SATIŞÇIM"
 #define MyAppExeName "SATISCIM.exe"
 
@@ -22,8 +22,8 @@ UninstallDisplayName={#MyAppName}
 Source: "..\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{#MyAppName} uygulamasını başlat"; Flags: nowait postinstall skipifsilent

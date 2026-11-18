@@ -1019,6 +1019,26 @@ public sealed class DatabaseService
         return storedHash is not null && storedHash == HashPassword(password);
     }
 
+    public bool ChangeAdminPassword(string currentPassword, string newPassword)
+    {
+        if (newPassword.Length < 8)
+        {
+            throw new ArgumentException("Yeni parola en az 8 karakter olmalıdır.", nameof(newPassword));
+        }
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE Users
+            SET PasswordHash = $newHash
+            WHERE Username = 'admin' AND Role = 'Admin' AND IsActive = 1
+              AND PasswordHash = $currentHash
+            """;
+        command.Parameters.AddWithValue("$newHash", HashPassword(newPassword));
+        command.Parameters.AddWithValue("$currentHash", HashPassword(currentPassword));
+        return command.ExecuteNonQuery() == 1;
+    }
+
     public void ResetAllBusinessData()
     {
         using var connection = OpenConnection();

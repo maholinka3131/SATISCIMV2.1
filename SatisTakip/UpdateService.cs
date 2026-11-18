@@ -6,7 +6,7 @@ namespace SatisTakip;
 
 public sealed class UpdateService
 {
-    private const string ManifestUrl = "https://raw.githubusercontent.com/maholinka3131/SATISCIM/main/update.json";
+    private const string ManifestUrl = "https://raw.githubusercontent.com/maholinka3131/SATISCIMV2.1/master/update.json";
     private readonly HttpClient client = new() { Timeout = TimeSpan.FromSeconds(5) };
 
     public async Task<UpdateInfo?> CheckAsync()

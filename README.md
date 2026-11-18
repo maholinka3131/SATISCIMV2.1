@@ -20,9 +20,9 @@ Urunlerde kritik stok esigi ayarlanabilir (varsayilan 5); bu esik ve altindaki u
 
 ## Kurulum ve guncelleme
 
-Kurulum dosyasi `setup-output/SATISCIM-Setup-1.0.0.exe` konumundadir. Yeni setup ayni `AppId` ile derlendigi icin eski uygulamanin uzerine guncelleme yapar; kullanici veritabani `AppData\Local\SatisTakip` altinda kaldigi icin silinmez.
+Kurulum dosyasi `setup-output/SATISCIM-Setup-1.0.1.exe` konumundadir. Uygulama Windows x64 icin self-contained yayinlanir; kullanicinin bilgisayarinda ayrica .NET Runtime kurulu olmasi gerekmez. Yeni setup ayni `AppId` ile derlendigi icin eski uygulamanin uzerine guncelleme yapar; kullanici veritabani `AppData\Local\SatisTakip` altinda kaldigi icin silinmez.
 
-Otomatik guncelleme icin sonraki adim, yeni setup dosyalarinin yayinlanacagi web veya GitHub Releases adresini belirlemektir. Bu adres verildiginde uygulamaya surum manifesti kontrolu eklenebilir.
+Uygulama acilisinda GitHub'daki `update.json` dosyasini kontrol eder. Daha yeni bir surum varsa indirme baglantisinin acilmasi icin kullanicidan onay ister; indirilen setup calistirilarak guncelleme tamamlanir.
 
 ## Calistirma
 
@@ -52,7 +52,7 @@ Ornek:
 ## Release cikti
 
 ```powershell
-dotnet publish SatisTakip\SatisTakip.csproj -c Release -r win-x64 --self-contained false -o publish
+dotnet publish SatisTakip\SatisTakip.csproj -c Release -r win-x64 --self-contained true -o publish
 ```
 
 Gun sonu ekraninda toplam ciro, urun maliyeti, brut kar, toplam gider ve net kar gorulur. Rapor penceresindeki `Yazdir` dugmesiyle yaziciya aktarilabilir. Urun, satis ve stok hareketleri SQLite veritabaninda kalici olarak saklanir.
