@@ -7,6 +7,7 @@
              Startup="Application_Startup">
     <Application.Resources>
         <ResourceDictionary>
+                    <BitmapImage x:Key="BrandLogo" UriSource="pack://application:,,,/SATISCIM;component/Assets/SatiscimLogoHiRes.png" />
                     <SolidColorBrush x:Key="BrandDeepBrush" Color="#0D3B49" />
                     <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F4F7F9" />
                     <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />

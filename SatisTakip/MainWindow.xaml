@@ -170,9 +170,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0">
-                <Border Width="25" Height="25" CornerRadius="7" Background="{StaticResource AccentAmberBrush}" Margin="0,0,9,0">
-                    <TextBlock Text="S" Foreground="{StaticResource BrandDeepBrush}" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
+                <Image Source="{StaticResource BrandLogo}" Width="28" Height="28" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,9,0" />
                 <TextBlock Text="SATIŞÇIM" Foreground="White" FontSize="13" FontWeight="Bold" VerticalAlignment="Center" />
                 <TextBlock Text="  |  SATIŞ NOKTASI" Foreground="#A9C3C9" FontSize="11" VerticalAlignment="Center" />
             </StackPanel>
@@ -205,7 +203,10 @@
             <DockPanel Margin="18,22">
                 <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <TextBlock Text="KONTROL PANELİ" Foreground="#9FC0C8" FontSize="10" FontWeight="Bold" Margin="2,6,0,2" />
+                    <StackPanel HorizontalAlignment="Center" Margin="0,4,0,10">
+                        <Image Source="{StaticResource BrandLogo}" Width="188" Height="188" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                        <TextBlock Text="Kasa • Stok • Satış Takip Sistemi" Foreground="#D7E5E8" FontSize="11" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" Margin="2,5,2,0" />
+                    </StackPanel>
                     <TextBlock x:Name="VersionText" Foreground="#9FC0C8" FontSize="10" Margin="2,0,0,19" />
                     <TextBlock Text="OPERASYON" Foreground="#80AAB4" FontSize="9" FontWeight="Bold" Margin="3,0,0,4" />
                     <Button Content="Kasa" Tag="Active" CommandParameter="{StaticResource CashIcon}" Style="{StaticResource NavButton}" />
