@@ -1,5 +1,5 @@
 {
-  "Version": "1.0.4",
-  "DownloadUrl": "https://github.com/maholinka3131/SATISCIMV2.1/releases/latest/download/SATISCIM-Setup-1.0.4.exe",
-  "Notes": "Barkod etiketi yazdırma önizlemesi iyileştirildi ve sürüm numarası ana ekranın sol üst köşesine eklendi."
+  "Version": "1.0.5",
+  "DownloadUrl": "https://github.com/maholinka3131/SATISCIMV2.1/releases/latest/download/SATISCIM-Setup-1.0.5.exe",
+  "Notes": "Giriş ve kasa arayüzü yenilendi; ürün kartı, sepet ve ödeme alanları iyileştirildi. Simge kırpılmaları ve görev çubuğu görünümü düzeltildi."
 }
