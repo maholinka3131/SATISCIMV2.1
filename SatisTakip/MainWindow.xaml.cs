@@ -2,9 +2,11 @@
 using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Reflection;
 
 namespace SatisTakip;
@@ -23,6 +25,85 @@ public partial class MainWindow : Window
     private readonly System.Windows.Threading.DispatcherTimer barcodeScanTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private CartItem? selectedCartItem;
     private decimal openingCash;
+
+    private const int WmGetMinMaxInfo = 0x0024;
+    private const uint MonitorDefaultToNearest = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMinMaxInfo
+    {
+        public NativePoint Reserved;
+        public NativePoint MaxSize;
+        public NativePoint MaxPosition;
+        public NativePoint MinTrackSize;
+        public NativePoint MaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMonitorInfo
+    {
+        public int Size;
+        public NativeRect Monitor;
+        public NativeRect Work;
+        public uint Flags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref NativeMonitorInfo monitorInfo);
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        if (PresentationSource.FromVisual(this) is HwndSource source)
+        {
+            source.AddHook(HandleWindowMessage);
+        }
+    }
+
+    private static IntPtr HandleWindowMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message != WmGetMinMaxInfo)
+        {
+            return IntPtr.Zero;
+        }
+
+        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        var monitorInfo = new NativeMonitorInfo { Size = Marshal.SizeOf<NativeMonitorInfo>() };
+        if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref monitorInfo))
+        {
+            return IntPtr.Zero;
+        }
+
+        var minMaxInfo = Marshal.PtrToStructure<NativeMinMaxInfo>(lParam);
+        minMaxInfo.MaxPosition.X = monitorInfo.Work.Left - monitorInfo.Monitor.Left;
+        minMaxInfo.MaxPosition.Y = monitorInfo.Work.Top - monitorInfo.Monitor.Top;
+        minMaxInfo.MaxSize.X = monitorInfo.Work.Right - monitorInfo.Work.Left;
+        minMaxInfo.MaxSize.Y = monitorInfo.Work.Bottom - monitorInfo.Work.Top;
+        minMaxInfo.MaxTrackSize = minMaxInfo.MaxSize;
+        Marshal.StructureToPtr(minMaxInfo, lParam, false);
+        handled = true;
+        return IntPtr.Zero;
+    }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
@@ -73,6 +154,17 @@ public partial class MainWindow : Window
         UpdateFinancialSummary();
     }
 
+    private void MinimizeWindowButton_Click(object sender, RoutedEventArgs e)
+        => WindowState = System.Windows.WindowState.Minimized;
+
+    private void ToggleWindowStateButton_Click(object sender, RoutedEventArgs e)
+        => WindowState = WindowState == System.Windows.WindowState.Maximized
+            ? System.Windows.WindowState.Normal
+            : System.Windows.WindowState.Maximized;
+
+    private void CloseWindowButton_Click(object sender, RoutedEventArgs e)
+        => Close();
+
     private void LoadProductsFromDatabase()
     {
         var storedProducts = database.LoadProducts();
@@ -118,13 +210,8 @@ public partial class MainWindow : Window
             var criticalStockCount = products.Count(product => product.IsLowStock);
             var alertLabel = new TextBlock();
             alertLabel.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding(nameof(Button.Foreground)) { Source = StockAlertsNavButton });
-            alertLabel.Inlines.Add(new System.Windows.Documents.Run("⚠")
-            {
-                Foreground = criticalStockCount > 0
-                    ? System.Windows.Media.Brushes.Red
-                    : System.Windows.Media.Brushes.LightGray
-            });
-            alertLabel.Inlines.Add(new System.Windows.Documents.Run($"   Kritik stok ({criticalStockCount})"));
+            alertLabel.Text = $"Kritik stok ({criticalStockCount})";
+            StockAlertsNavButton.Tag = criticalStockCount > 0 ? "Alert" : null;
             StockAlertsNavButton.Content = alertLabel;
         }
     }
@@ -289,6 +376,10 @@ public partial class MainWindow : Window
 
     private void IncreaseQuantityButton_Click(object sender, RoutedEventArgs e)
     {
+        if ((sender as FrameworkElement)?.Tag is CartItem clickedItem)
+        {
+            CartGrid.SelectedItem = clickedItem;
+        }
         if (selectedCartItem is null) return;
         selectedCartItem.Quantity++;
         UpdateTotals();
@@ -296,6 +387,10 @@ public partial class MainWindow : Window
 
     private void DecreaseQuantityButton_Click(object sender, RoutedEventArgs e)
     {
+        if ((sender as FrameworkElement)?.Tag is CartItem clickedItem)
+        {
+            CartGrid.SelectedItem = clickedItem;
+        }
         if (selectedCartItem is null) return;
         if (selectedCartItem.Quantity == 1)
         {
