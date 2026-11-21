@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Microsoft.Data.Sqlite;
 
 namespace SatisTakip;
 
@@ -10,6 +11,8 @@ public sealed class ProductListWindow : Window
     private readonly ObservableCollection<Product> products;
     private readonly DatabaseService database = new();
     private readonly DataGrid productGrid = new();
+
+    public Product? AddedProduct { get; private set; }
 
     public ProductListWindow(ObservableCollection<Product> products)
     {
@@ -90,12 +93,16 @@ public sealed class ProductListWindow : Window
             ? new SolidColorBrush(Color.FromRgb(255, 240, 235))
             : Brushes.White;
         var menu = new ContextMenu();
+        var categoryItem = new MenuItem { Header = "Kategoriyi değiştir" };
+        categoryItem.Click += RowChangeCategoryItem_Click;
         var editItem = new MenuItem { Header = "Ürünü düzenle" };
         editItem.Click += RowEditItem_Click;
         var deleteItem = new MenuItem { Header = "Ürünü sil" };
         deleteItem.Click += RowDeleteItem_Click;
         var printLabelItem = new MenuItem { Header = "Barkod etiketi yazdır" };
         printLabelItem.Click += RowPrintLabelItem_Click;
+        menu.Items.Add(categoryItem);
+        menu.Items.Add(new Separator());
         menu.Items.Add(editItem);
         menu.Items.Add(deleteItem);
         menu.Items.Add(new Separator());
@@ -109,6 +116,15 @@ public sealed class ProductListWindow : Window
         {
             productGrid.SelectedItem = product;
             EditButton_Click(sender, e);
+        }
+    }
+
+    private void RowChangeCategoryItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem item && item.Parent is ContextMenu menu && menu.PlacementTarget is DataGridRow row && row.Item is Product product)
+        {
+            productGrid.SelectedItem = product;
+            ChangeProductCategory(product);
         }
     }
 
@@ -137,7 +153,8 @@ public sealed class ProductListWindow : Window
         {
             products.Add(dialog.Product);
             database.SaveProduct(dialog.Product);
-            productGrid.Items.Refresh();
+            AddedProduct = dialog.Product;
+            DialogResult = true;
         }
     }
 
@@ -156,12 +173,36 @@ public sealed class ProductListWindow : Window
             product.Name = dialog.Product.Name;
             product.Category = dialog.Product.Category;
             product.CostPrice = dialog.Product.CostPrice;
+            product.VatRate = dialog.Product.VatRate;
             product.Price = dialog.Product.Price;
             product.Stock = dialog.Product.Stock;
             product.MinimumStock = dialog.Product.MinimumStock;
             database.SaveProduct(product);
             productGrid.Items.Refresh();
         }
+    }
+
+    private void ChangeProductCategory(Product product)
+    {
+        var dialog = new ProductCategoryDialog(product, database.LoadCategories()) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.SelectedCategory is not { } newCategory)
+        {
+            return;
+        }
+
+        var oldCategory = product.Category;
+        product.Category = newCategory;
+        try
+        {
+            database.SaveProduct(product);
+        }
+        catch (SqliteException exception)
+        {
+            product.Category = oldCategory;
+            MessageBox.Show(this, $"Ürün kategorisi güncellenemedi.\n{exception.Message}", "Kategori değiştirilemedi", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+        productGrid.Items.Refresh();
     }
 
     private void DeleteButton_Click(object sender, RoutedEventArgs e)

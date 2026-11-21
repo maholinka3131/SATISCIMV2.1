@@ -60,7 +60,7 @@ public sealed class AdminSettingsWindow : Window
         resetButton.FontWeight = FontWeights.Bold;
         resetButton.Click += ResetButton_Click;
         panel.Children.Add(resetButton);
-        panel.Children.Add(new TextBlock { Text = "Bu işlem ürünleri, stokları, satışları, müşterileri, giderleri ve ayarları kalıcı olarak siler. Yönetici hesabı korunur.", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(194, 65, 58)), Margin = new Thickness(0, 14, 0, 0) });
+        panel.Children.Add(new TextBlock { Text = "Bu işlem ürünleri, stokları, kategorileri, satışları, müşterileri, giderleri, ayarları ve yönetici dışındaki kullanıcı hesaplarını kalıcı olarak siler. Yönetici hesabı korunur.", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(194, 65, 58)), Margin = new Thickness(0, 14, 0, 0) });
         Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = panel };
     }
 
@@ -128,7 +128,7 @@ public sealed class AdminSettingsWindow : Window
 
     private void ResetButton_Click(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show("Tüm ürünler, satışlar, müşteriler, giderler ve ayarlar silinecek. Devam edilsin mi?", "Fabrika ayarları", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        if (MessageBox.Show("Tüm ürünler, stok hareketleri, kategoriler, satışlar, müşteriler, giderler, ayarlar ve yönetici dışındaki kullanıcı hesapları silinecek. Yönetici hesabı korunacak. Devam edilsin mi?", "Fabrika ayarları", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
             return;
         }

@@ -52,7 +52,7 @@ public sealed class StockMovementWindow : Window
         };
         grid.Columns.Add(new DataGridTextColumn { Header = "Tarih", Binding = new System.Windows.Data.Binding(nameof(StockMovement.Date)) { StringFormat = "dd.MM.yyyy HH:mm" }, Width = 145 });
         grid.Columns.Add(new DataGridTextColumn { Header = "Ürün", Binding = new System.Windows.Data.Binding(nameof(StockMovement.ProductName)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "İşlem", Binding = new System.Windows.Data.Binding(nameof(StockMovement.Type)), Width = 110 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "İşlem", Binding = new System.Windows.Data.Binding(nameof(StockMovement.TypeDisplay)), Width = 110 });
         grid.Columns.Add(new DataGridTextColumn { Header = "Değişim", Binding = new System.Windows.Data.Binding(nameof(StockMovement.Quantity)) { StringFormat = "{0:+0.##;-0.##;0}" }, Width = 90 });
         grid.Columns.Add(new DataGridTextColumn { Header = "Önceki stok", Binding = new System.Windows.Data.Binding(nameof(StockMovement.PreviousStock)) { StringFormat = "N2" }, Width = 100 });
         grid.Columns.Add(new DataGridTextColumn { Header = "Yeni stok", Binding = new System.Windows.Data.Binding(nameof(StockMovement.NewStock)) { StringFormat = "N2" }, Width = 90 });

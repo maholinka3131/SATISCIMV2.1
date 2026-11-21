@@ -18,12 +18,14 @@ public partial class MainWindow : Window
 {
     private readonly ObservableCollection<Product> products = new();
     private readonly ObservableCollection<Product> visibleProducts = new();
+    private readonly List<string> categories = new();
     private readonly ObservableCollection<CartItem> cart = new();
     private readonly ObservableCollection<SaleRecord> sales = new();
     private readonly ObservableCollection<Expense> expenses = new();
     private readonly DatabaseService database;
     private readonly System.Windows.Threading.DispatcherTimer barcodeScanTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private CartItem? selectedCartItem;
+    private string? selectedCategory;
     private decimal openingCash;
 
     private const int WmGetMinMaxInfo = 0x0024;
@@ -147,6 +149,7 @@ public partial class MainWindow : Window
             OpeningCashBox.Text = openingCash.ToString("N2");
         }
         ProductButtons.ItemsSource = visibleProducts;
+        ReloadCategories();
         CartGrid.ItemsSource = cart;
         cart.CollectionChanged += Cart_CollectionChanged;
         RefreshProductList();
@@ -196,14 +199,16 @@ public partial class MainWindow : Window
     {
         var query = SearchBox?.Text?.Trim() ?? "";
         visibleProducts.Clear();
-        foreach (var product in products.Where(product => string.IsNullOrWhiteSpace(query) || product.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase) || product.Barcode.Contains(query, StringComparison.CurrentCultureIgnoreCase)))
+        foreach (var product in products.Where(product =>
+                     (selectedCategory is null || string.Equals(product.Category, selectedCategory, StringComparison.CurrentCultureIgnoreCase)) &&
+                     (string.IsNullOrWhiteSpace(query) || product.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase) || product.Barcode.Contains(query, StringComparison.CurrentCultureIgnoreCase))))
         {
             visibleProducts.Add(product);
         }
 
         if (ProductCountText is not null)
         {
-            ProductCountText.Text = $"{products.Count} ürün";
+            ProductCountText.Text = $"{visibleProducts.Count} ürün";
         }
         if (StockAlertsNavButton is not null)
         {
@@ -214,6 +219,213 @@ public partial class MainWindow : Window
             StockAlertsNavButton.Tag = criticalStockCount > 0 ? "Alert" : null;
             StockAlertsNavButton.Content = alertLabel;
         }
+    }
+
+    private void ReloadCategories()
+    {
+        categories.Clear();
+        categories.AddRange(database.LoadCategories());
+        if (selectedCategory is not null &&
+            !categories.Any(category => string.Equals(category, selectedCategory, StringComparison.CurrentCultureIgnoreCase)))
+        {
+            selectedCategory = null;
+        }
+
+        CategorySelectionText.Text = selectedCategory ?? "Tüm kategoriler";
+        RefreshCategoryButtons();
+        RefreshProductList();
+    }
+
+    private void RefreshCategoryButtons()
+    {
+        CategoryButtonsPanel.Children.Clear();
+        var query = CategorySearchBox?.Text?.Trim() ?? "";
+        AddCategoryButton("Tüm ürünler", null, selectedCategory is null);
+
+        foreach (var category in categories.Where(category =>
+                     string.IsNullOrWhiteSpace(query) ||
+                     category.Contains(query, StringComparison.CurrentCultureIgnoreCase)))
+        {
+            AddCategoryButton(category, category, string.Equals(category, selectedCategory, StringComparison.CurrentCultureIgnoreCase));
+        }
+    }
+
+    private void AddCategoryButton(string title, string? category, bool isSelected)
+    {
+        var button = new Button
+        {
+            Content = title,
+            Tag = category,
+            Style = (Style)FindResource("RoundedButton"),
+            Background = isSelected
+                ? (System.Windows.Media.Brush)FindResource("Accent")
+                : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(242, 248, 250)),
+            Foreground = isSelected
+                ? System.Windows.Media.Brushes.White
+                : (System.Windows.Media.Brush)FindResource("Accent"),
+            BorderBrush = isSelected
+                ? (System.Windows.Media.Brush)FindResource("Accent")
+                : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(213, 233, 238)),
+            Padding = new Thickness(10, 5, 10, 5),
+            Margin = new Thickness(0, 0, 6, 6),
+            FontSize = 11
+        };
+        button.Click += CategoryFilterButton_Click;
+        if (category is not null)
+        {
+            var menu = new ContextMenu();
+            var editCategory = new MenuItem { Header = "Kategori adını düzenle" };
+            editCategory.Click += EditCategoryMenuItem_Click;
+            var deleteCategory = new MenuItem { Header = "Kategoriyi sil" };
+            deleteCategory.Click += DeleteCategoryMenuItem_Click;
+            menu.Items.Add(editCategory);
+            menu.Items.Add(deleteCategory);
+            button.ContextMenu = menu;
+        }
+        CategoryButtonsPanel.Children.Add(button);
+    }
+
+    private void CategoryFilterButton_Click(object sender, RoutedEventArgs e)
+    {
+        selectedCategory = (sender as Button)?.Tag as string;
+        CategorySelectionText.Text = selectedCategory ?? "Tüm kategoriler";
+        RefreshCategoryButtons();
+        RefreshProductList();
+    }
+
+    private void CategorySearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        RefreshCategoryButtons();
+    }
+
+    private void EditCategoryMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetCategoryFromMenu(sender, out var category))
+        {
+            return;
+        }
+
+        var dialog = new CategoryDialog(category) { Owner = this };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            database.RenameCategory(category, dialog.CategoryName);
+        }
+        catch (InvalidOperationException exception)
+        {
+            MessageBox.Show(this, exception.Message, "Kategori düzenlenemedi", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException exception)
+        {
+            MessageBox.Show(this, $"Kategori düzenlenemedi.\n{exception.Message}", "Kategori düzenlenemedi", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        foreach (var product in products.Where(product => string.Equals(product.Category, category, StringComparison.CurrentCultureIgnoreCase)))
+        {
+            product.Category = dialog.CategoryName.Trim();
+        }
+        if (string.Equals(selectedCategory, category, StringComparison.CurrentCultureIgnoreCase))
+        {
+            selectedCategory = dialog.CategoryName.Trim();
+        }
+        ReloadCategories();
+    }
+
+    private void DeleteCategoryMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetCategoryFromMenu(sender, out var category))
+        {
+            return;
+        }
+        if (string.Equals(category, "Genel", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show(this, "Genel kategorisi varsayılan kategori olduğu için silinemez.", "Kategori silinemedi", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var productNames = database.LoadProductNamesInCategory(category);
+        var dialog = new CategoryDeleteDialog(category, productNames) { Owner = this };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            database.DeleteCategory(category);
+        }
+        catch (InvalidOperationException exception)
+        {
+            MessageBox.Show(this, exception.Message, "Kategori silinemedi", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException exception)
+        {
+            MessageBox.Show(this, $"Kategori silinemedi.\n{exception.Message}", "Kategori silinemedi", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        foreach (var product in products.Where(product => string.Equals(product.Category, category, StringComparison.CurrentCultureIgnoreCase)))
+        {
+            product.Category = "Genel";
+        }
+        if (string.Equals(selectedCategory, category, StringComparison.CurrentCultureIgnoreCase))
+        {
+            selectedCategory = null;
+        }
+        ReloadCategories();
+    }
+
+    private static bool TryGetCategoryFromMenu(object sender, out string category)
+    {
+        if (sender is MenuItem menuItem &&
+            menuItem.Parent is ContextMenu contextMenu &&
+            contextMenu.PlacementTarget is Button button &&
+            button.Tag is string categoryName)
+        {
+            category = categoryName;
+            return true;
+        }
+
+        category = "";
+        return false;
+    }
+
+    private void ChangeProductCategoryMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem ||
+            menuItem.Parent is not ContextMenu contextMenu ||
+            contextMenu.PlacementTarget is not Button button ||
+            button.Tag is not Product product)
+        {
+            return;
+        }
+
+        var dialog = new ProductCategoryDialog(product, database.LoadCategories()) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.SelectedCategory is not { } newCategory)
+        {
+            return;
+        }
+
+        var oldCategory = product.Category;
+        product.Category = newCategory;
+        try
+        {
+            database.SaveProduct(product);
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException exception)
+        {
+            product.Category = oldCategory;
+            MessageBox.Show(this, $"Ürün kategorisi güncellenemedi.\n{exception.Message}", "Kategori değiştirilemedi", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+        ReloadCategories();
     }
 
     private void ConfigurePermissions()
@@ -501,12 +713,19 @@ public partial class MainWindow : Window
     {
         if (!RequireAdmin()) return;
         var dialog = new ProductDialog { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Product is not null)
+        var result = dialog.ShowDialog();
+        ReloadCategories();
+        if (result == true && dialog.Product is not null)
         {
             products.Add(dialog.Product);
             database.SaveProduct(dialog.Product);
             RefreshProductList();
             SearchBox.Clear();
+            MessageBox.Show(this,
+                $"{dialog.Product.Name} stoğa eklendi.\nBaşlangıç stoğu: {dialog.Product.Stock:N2} adet",
+                "Ürün eklendi",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
     }
 
@@ -519,12 +738,15 @@ public partial class MainWindow : Window
         }
 
         var dialog = new ProductDialog(product) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Product is not null)
+        var result = dialog.ShowDialog();
+        ReloadCategories();
+        if (result == true && dialog.Product is not null)
         {
             product.Barcode = dialog.Product.Barcode;
             product.Name = dialog.Product.Name;
             product.Category = dialog.Product.Category;
             product.CostPrice = dialog.Product.CostPrice;
+            product.VatRate = dialog.Product.VatRate;
             product.Price = dialog.Product.Price;
             product.Stock = dialog.Product.Stock;
             product.MinimumStock = dialog.Product.MinimumStock;
@@ -569,7 +791,15 @@ public partial class MainWindow : Window
         if (!RequireAdmin()) return;
         var window = new ProductListWindow(products) { Owner = this };
         window.ShowDialog();
-        RefreshProductList();
+        ReloadCategories();
+        if (window.AddedProduct is { } addedProduct)
+        {
+            MessageBox.Show(this,
+                $"{addedProduct.Name} stoğa eklendi.\nBaşlangıç stoğu: {addedProduct.Stock:N2} adet",
+                "Ürün eklendi",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
     }
 
     private void StockEntryButton_Click(object sender, RoutedEventArgs e)
@@ -577,7 +807,18 @@ public partial class MainWindow : Window
         if (!RequireAdmin()) return;
         var window = new StockEntryWindow(products, database) { Owner = this };
         window.ShowDialog();
-        RefreshProductList();
+        ReloadCategories();
+        if (window.AddedProduct is { } addedProduct)
+        {
+            var stockMessage = window.AddedToExistingProduct
+                ? $"Güncel stok: {addedProduct.Stock:N2} adet"
+                : $"Başlangıç stoğu: {addedProduct.Stock:N2} adet";
+            MessageBox.Show(this,
+                $"{addedProduct.Name} stoğa eklendi.\n{stockMessage}",
+                window.AddedToExistingProduct ? "Stok güncellendi" : "Ürün eklendi",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
     }
 
     private void AddExpenseButton_Click(object sender, RoutedEventArgs e)
@@ -666,7 +907,11 @@ public partial class MainWindow : Window
     private void RestoreButton_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireAdmin()) return;
-        var dialog = new OpenFileDialog { Filter = "SQLite yedek dosyası (*.db)|*.db", Title = "Geri yüklenecek yedeği seçin" };
+        var dialog = new OpenFileDialog
+        {
+            Filter = "SQLite yedek dosyası (*.db)|*.db",
+            Title = "Geri yüklenecek yedeği seçin"
+        };
         if (dialog.ShowDialog() != true) return;
         if (MessageBox.Show("Mevcut verilerin üzerine yedek geri yüklensin mi?", "Geri yükleme", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         database.Restore(dialog.FileName);
@@ -719,6 +964,7 @@ public partial class MainWindow : Window
         {
             barcodeScanTimer.Start();
         }
+
     }
 
     private void ImportExcelButton_Click(object sender, RoutedEventArgs e)
@@ -774,7 +1020,7 @@ public partial class MainWindow : Window
                 imported++;
             }
 
-            RefreshProductList();
+            ReloadCategories();
             MessageBox.Show($"{imported} ürün içe aktarıldı.", "Excel aktarımı", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception exception)
@@ -803,7 +1049,14 @@ public partial class MainWindow : Window
 
     private void UpdateSelectedProduct()
     {
-        SelectedProductText.Text = selectedCartItem is null ? "Bir ürün seçin" : selectedCartItem.Name;
+        if (selectedCartItem is null)
+        {
+            SelectedProductText.Text = "Bir ürün seçin";
+        }
+        else
+        {
+            SelectedProductText.Text = selectedCartItem.Name;
+        }
         QuantityText.Text = selectedCartItem?.Quantity.ToString() ?? "1";
     }
 

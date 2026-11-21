@@ -33,12 +33,17 @@ public sealed class DatabaseService
                 Name TEXT NOT NULL,
                 Category TEXT NOT NULL DEFAULT 'Genel',
                 CostPrice REAL NOT NULL DEFAULT 0,
+                VatRate REAL NULL,
                 Price REAL NOT NULL DEFAULT 0,
                 Stock REAL NOT NULL DEFAULT 0,
                 MinimumStock REAL NOT NULL DEFAULT 5,
                 IsActive INTEGER NOT NULL DEFAULT 1
             );
             CREATE UNIQUE INDEX IF NOT EXISTS IX_Products_Barcode ON Products(Barcode) WHERE Barcode <> '';
+            CREATE TABLE IF NOT EXISTS Categories (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL COLLATE NOCASE UNIQUE
+            );
             CREATE TABLE IF NOT EXISTS Sales (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 SaleDate TEXT NOT NULL,
@@ -105,10 +110,24 @@ public sealed class DatabaseService
             );
             """;
         command.ExecuteNonQuery();
+        EnsureCategories();
         EnsureProductMinimumStockColumn();
+        EnsureProductVatRateColumn();
         EnsureSalesPaymentColumns();
         EnsureSaleItemReturnColumn();
         EnsureDefaultUser();
+    }
+
+    private void EnsureCategories()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE Products SET Category = 'Genel' WHERE TRIM(Category) = '';
+            INSERT OR IGNORE INTO Categories (Name)
+            SELECT DISTINCT TRIM(Category) FROM Products WHERE TRIM(Category) <> '';
+            """;
+        command.ExecuteNonQuery();
     }
 
     private void EnsureProductMinimumStockColumn()
@@ -128,6 +147,26 @@ public sealed class DatabaseService
         reader.Close();
         using var alter = connection.CreateCommand();
         alter.CommandText = "ALTER TABLE Products ADD COLUMN MinimumStock REAL NOT NULL DEFAULT 5";
+        alter.ExecuteNonQuery();
+    }
+
+    private void EnsureProductVatRateColumn()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info(Products)";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.GetString(1) == "VatRate")
+            {
+                return;
+            }
+        }
+
+        reader.Close();
+        using var alter = connection.CreateCommand();
+        alter.CommandText = "ALTER TABLE Products ADD COLUMN VatRate REAL NULL";
         alter.ExecuteNonQuery();
     }
 
@@ -182,7 +221,7 @@ public sealed class DatabaseService
     {
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id, Barcode, Name, Category, CostPrice, Price, Stock, MinimumStock FROM Products WHERE IsActive = 1 ORDER BY Name";
+        command.CommandText = "SELECT Id, Barcode, Name, Category, CostPrice, VatRate, Price, Stock, MinimumStock FROM Products WHERE IsActive = 1 ORDER BY Name";
         using var reader = command.ExecuteReader();
         var products = new List<Product>();
         while (reader.Read())
@@ -194,18 +233,177 @@ public sealed class DatabaseService
                 Name = reader.GetString(2),
                 Category = reader.GetString(3),
                 CostPrice = ReadDecimal(reader, 4),
-                Price = ReadDecimal(reader, 5),
-                Stock = ReadDecimal(reader, 6),
-                MinimumStock = ReadDecimal(reader, 7)
+                VatRate = reader.IsDBNull(5) ? null : ReadDecimal(reader, 5),
+                Price = ReadDecimal(reader, 6),
+                Stock = ReadDecimal(reader, 7),
+                MinimumStock = ReadDecimal(reader, 8)
             });
         }
         return products;
+    }
+
+    public List<string> LoadCategories()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Name FROM Categories ORDER BY Name COLLATE NOCASE";
+        using var reader = command.ExecuteReader();
+        var categories = new List<string>();
+        while (reader.Read())
+        {
+            categories.Add(reader.GetString(0));
+        }
+        return categories;
+    }
+
+    public void SaveCategory(string name)
+    {
+        var category = name.Trim();
+        if (string.IsNullOrWhiteSpace(category))
+        {
+            throw new ArgumentException("Kategori adı boş olamaz.", nameof(name));
+        }
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "INSERT OR IGNORE INTO Categories (Name) VALUES ($name)";
+        command.Parameters.AddWithValue("$name", category);
+        command.ExecuteNonQuery();
+    }
+
+    public List<string> LoadProductNamesInCategory(string categoryName)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Name FROM Products WHERE Category = $category COLLATE NOCASE ORDER BY Name COLLATE NOCASE";
+        command.Parameters.AddWithValue("$category", categoryName.Trim());
+        using var reader = command.ExecuteReader();
+        var productNames = new List<string>();
+        while (reader.Read())
+        {
+            productNames.Add(reader.GetString(0));
+        }
+        return productNames;
+    }
+
+    public void RenameCategory(string oldName, string newName)
+    {
+        var oldCategory = oldName.Trim();
+        var newCategory = newName.Trim();
+        if (string.IsNullOrWhiteSpace(oldCategory) || string.IsNullOrWhiteSpace(newCategory))
+        {
+            throw new ArgumentException("Kategori adı boş olamaz.");
+        }
+        if (string.Equals(oldCategory, "Genel", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Genel kategorisi varsayılan kategori olduğu için yeniden adlandırılamaz.");
+        }
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using (var find = connection.CreateCommand())
+        {
+            find.Transaction = transaction;
+            find.CommandText = "SELECT EXISTS(SELECT 1 FROM Categories WHERE Name = $name COLLATE NOCASE)";
+            find.Parameters.AddWithValue("$name", oldCategory);
+            if (Convert.ToInt64(find.ExecuteScalar()) != 1)
+            {
+                throw new InvalidOperationException("Düzenlenecek kategori bulunamadı.");
+            }
+        }
+
+        using (var duplicate = connection.CreateCommand())
+        {
+            duplicate.Transaction = transaction;
+            duplicate.CommandText = "SELECT EXISTS(SELECT 1 FROM Categories WHERE Name = $newName COLLATE NOCASE AND Name <> $oldName COLLATE NOCASE)";
+            duplicate.Parameters.AddWithValue("$newName", newCategory);
+            duplicate.Parameters.AddWithValue("$oldName", oldCategory);
+            if (Convert.ToInt64(duplicate.ExecuteScalar()) == 1)
+            {
+                throw new InvalidOperationException("Bu isimde bir kategori zaten var.");
+            }
+        }
+
+        using (var updateProducts = connection.CreateCommand())
+        {
+            updateProducts.Transaction = transaction;
+            updateProducts.CommandText = "UPDATE Products SET Category = $newName WHERE Category = $oldName COLLATE NOCASE";
+            updateProducts.Parameters.AddWithValue("$newName", newCategory);
+            updateProducts.Parameters.AddWithValue("$oldName", oldCategory);
+            updateProducts.ExecuteNonQuery();
+        }
+
+        using (var updateCategory = connection.CreateCommand())
+        {
+            updateCategory.Transaction = transaction;
+            updateCategory.CommandText = "UPDATE Categories SET Name = $newName WHERE Name = $oldName COLLATE NOCASE";
+            updateCategory.Parameters.AddWithValue("$newName", newCategory);
+            updateCategory.Parameters.AddWithValue("$oldName", oldCategory);
+            updateCategory.ExecuteNonQuery();
+        }
+        transaction.Commit();
+    }
+
+    public void DeleteCategory(string name)
+    {
+        var category = name.Trim();
+        if (string.IsNullOrWhiteSpace(category))
+        {
+            throw new ArgumentException("Kategori adı boş olamaz.", nameof(name));
+        }
+        if (string.Equals(category, "Genel", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Genel kategorisi varsayılan kategori olduğu için silinemez.");
+        }
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using (var find = connection.CreateCommand())
+        {
+            find.Transaction = transaction;
+            find.CommandText = "SELECT EXISTS(SELECT 1 FROM Categories WHERE Name = $name COLLATE NOCASE)";
+            find.Parameters.AddWithValue("$name", category);
+            if (Convert.ToInt64(find.ExecuteScalar()) != 1)
+            {
+                throw new InvalidOperationException("Silinecek kategori bulunamadı.");
+            }
+        }
+
+        long productCount;
+        using (var count = connection.CreateCommand())
+        {
+            count.Transaction = transaction;
+            count.CommandText = "SELECT COUNT(*) FROM Products WHERE Category = $name COLLATE NOCASE";
+            count.Parameters.AddWithValue("$name", category);
+            productCount = Convert.ToInt64(count.ExecuteScalar());
+        }
+
+        if (productCount > 0)
+        {
+            EnsureCategoryExists(connection, transaction, "Genel");
+            using var moveProducts = connection.CreateCommand();
+            moveProducts.Transaction = transaction;
+            moveProducts.CommandText = "UPDATE Products SET Category = 'Genel' WHERE Category = $name COLLATE NOCASE";
+            moveProducts.Parameters.AddWithValue("$name", category);
+            moveProducts.ExecuteNonQuery();
+        }
+
+        using (var delete = connection.CreateCommand())
+        {
+            delete.Transaction = transaction;
+            delete.CommandText = "DELETE FROM Categories WHERE Name = $name COLLATE NOCASE";
+            delete.Parameters.AddWithValue("$name", category);
+            delete.ExecuteNonQuery();
+        }
+        transaction.Commit();
     }
 
     public void SaveProduct(Product product)
     {
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
+        product.Category = string.IsNullOrWhiteSpace(product.Category) ? "Genel" : product.Category.Trim();
+        EnsureCategoryExists(connection, transaction, product.Category);
         long existingId = 0;
         decimal previousStock = 0;
         using (var find = connection.CreateCommand())
@@ -213,7 +411,13 @@ public sealed class DatabaseService
             find.Transaction = transaction;
             find.CommandText = product.Id > 0
                 ? "SELECT Id, Stock FROM Products WHERE Id = $id"
-                : "SELECT Id, Stock FROM Products WHERE ((Barcode = $barcode AND $barcode <> '') OR (Barcode = '' AND Name = $name)) AND IsActive = 1 LIMIT 1";
+                : """
+                  SELECT Id, Stock FROM Products
+                  WHERE (Barcode = $barcode AND $barcode <> '')
+                     OR (Barcode = '' AND Name = $name AND IsActive = 1)
+                  ORDER BY IsActive DESC
+                  LIMIT 1
+                  """;
             if (product.Id > 0)
             {
                 find.Parameters.AddWithValue("$id", product.Id);
@@ -237,13 +441,13 @@ public sealed class DatabaseService
             ? """
               UPDATE Products
               SET Barcode = $barcode, Name = $name, Category = $category,
-                  CostPrice = $cost, Price = $price, Stock = $stock,
+                  CostPrice = $cost, VatRate = $vatRate, Price = $price, Stock = $stock,
                   MinimumStock = $minimumStock, IsActive = 1
               WHERE Id = $id
               """
             : """
-              INSERT INTO Products (Barcode, Name, Category, CostPrice, Price, Stock, MinimumStock)
-              VALUES ($barcode, $name, $category, $cost, $price, $stock, $minimumStock)
+              INSERT INTO Products (Barcode, Name, Category, CostPrice, VatRate, Price, Stock, MinimumStock)
+              VALUES ($barcode, $name, $category, $cost, $vatRate, $price, $stock, $minimumStock)
               """;
         AddProductParameters(save, product);
         if (existingId > 0)
@@ -278,7 +482,7 @@ public sealed class DatabaseService
 
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT EXISTS(SELECT 1 FROM Products WHERE Barcode = $barcode AND ($currentBarcode IS NULL OR Barcode <> $currentBarcode))";
+        command.CommandText = "SELECT EXISTS(SELECT 1 FROM Products WHERE Barcode = $barcode AND IsActive = 1 AND ($currentBarcode IS NULL OR Barcode <> $currentBarcode))";
         command.Parameters.AddWithValue("$barcode", barcode.Trim());
         command.Parameters.AddWithValue("$currentBarcode", (object?)currentBarcode ?? DBNull.Value);
         return Convert.ToInt64(command.ExecuteScalar()) == 1;
@@ -311,11 +515,23 @@ public sealed class DatabaseService
         return nextBarcode;
     }
 
-    public decimal AddStock(string barcode, string productName, decimal quantity)
+    public decimal AddStock(string barcode, string productName, decimal quantity, decimal? newCostPrice = null, decimal? vatRate = null, string note = "")
     {
         if (quantity <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(quantity), "Stok girişi miktarı sıfırdan büyük olmalıdır.");
+        }
+        if (newCostPrice < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(newCostPrice), "Alış maliyeti sıfır veya daha büyük olmalıdır.");
+        }
+        if (vatRate.HasValue && vatRate.Value != 1m && vatRate.Value != 10m && vatRate.Value != 20m)
+        {
+            throw new ArgumentOutOfRangeException(nameof(vatRate), "KDV oranı %1, %10 veya %20 olmalıdır.");
+        }
+        if (newCostPrice is null && vatRate.HasValue)
+        {
+            throw new ArgumentException("KDV oranı yalnızca alış maliyeti güncellenirken verilebilir.", nameof(vatRate));
         }
         if (string.IsNullOrWhiteSpace(barcode))
         {
@@ -326,10 +542,11 @@ public sealed class DatabaseService
         using var transaction = connection.BeginTransaction();
         long productId;
         decimal previousStock;
+        decimal? existingVatRate;
         using (var find = connection.CreateCommand())
         {
             find.Transaction = transaction;
-            find.CommandText = "SELECT Id, Stock FROM Products WHERE Barcode = $barcode AND Name = $name AND IsActive = 1";
+            find.CommandText = "SELECT Id, Stock, VatRate FROM Products WHERE Barcode = $barcode AND Name = $name AND IsActive = 1";
             find.Parameters.AddWithValue("$barcode", barcode);
             find.Parameters.AddWithValue("$name", productName);
             using var reader = find.ExecuteReader();
@@ -340,13 +557,29 @@ public sealed class DatabaseService
             }
             productId = reader.GetInt64(0);
             previousStock = ReadDecimal(reader, 1);
+            existingVatRate = reader.IsDBNull(2) ? null : ReadDecimal(reader, 2);
+        }
+
+        var effectiveVatRate = vatRate ?? existingVatRate;
+        if (newCostPrice.HasValue && effectiveVatRate is null)
+        {
+            transaction.Rollback();
+            throw new InvalidOperationException("Bu ürün için KDV oranı kayıtlı değil. Alış maliyetini güncellemek için önce KDV oranını seçin.");
         }
 
         using (var update = connection.CreateCommand())
         {
             update.Transaction = transaction;
-            update.CommandText = "UPDATE Products SET Stock = Stock + $quantity WHERE Id = $id AND IsActive = 1";
+            update.CommandText = """
+                UPDATE Products
+                SET Stock = Stock + $quantity,
+                    CostPrice = CASE WHEN $cost IS NULL THEN CostPrice ELSE $cost END,
+                    VatRate = CASE WHEN $vatRate IS NULL THEN VatRate ELSE $vatRate END
+                WHERE Id = $id AND IsActive = 1
+                """;
             update.Parameters.AddWithValue("$quantity", quantity);
+            update.Parameters.AddWithValue("$cost", (object?)newCostPrice ?? DBNull.Value);
+            update.Parameters.AddWithValue("$vatRate", (object?)(newCostPrice.HasValue ? effectiveVatRate : null) ?? DBNull.Value);
             update.Parameters.AddWithValue("$id", productId);
             if (update.ExecuteNonQuery() != 1)
             {
@@ -363,7 +596,7 @@ public sealed class DatabaseService
             query.Parameters.AddWithValue("$id", productId);
             updatedStock = Convert.ToDecimal(query.ExecuteScalar(), CultureInfo.InvariantCulture);
         }
-        RecordStockMovement(connection, transaction, productId, productName, "Stok girişi", quantity, previousStock, updatedStock, "");
+        RecordStockMovement(connection, transaction, productId, productName, "Stok girişi", quantity, previousStock, updatedStock, note);
         transaction.Commit();
         return updatedStock;
     }
@@ -1043,11 +1276,17 @@ public sealed class DatabaseService
     {
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
-        foreach (var table in new[] { "StockMovements", "SaleItems", "Sales", "Payments", "Customers", "Expenses", "Products", "Settings" })
+        foreach (var table in new[] { "StockMovements", "SaleItems", "Sales", "Payments", "Customers", "Expenses", "Products", "Categories", "Settings" })
         {
             using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = $"DELETE FROM {table}";
+            command.ExecuteNonQuery();
+        }
+        using (var command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = "DELETE FROM Users WHERE Username <> 'admin'";
             command.ExecuteNonQuery();
         }
         transaction.Commit();
@@ -1095,9 +1334,19 @@ public sealed class DatabaseService
         command.Parameters.AddWithValue("$name", product.Name);
         command.Parameters.AddWithValue("$category", product.Category);
         command.Parameters.AddWithValue("$cost", product.CostPrice);
+        command.Parameters.AddWithValue("$vatRate", (object?)product.VatRate ?? DBNull.Value);
         command.Parameters.AddWithValue("$price", product.Price);
         command.Parameters.AddWithValue("$stock", product.Stock);
         command.Parameters.AddWithValue("$minimumStock", product.MinimumStock);
+    }
+
+    private static void EnsureCategoryExists(SqliteConnection connection, SqliteTransaction transaction, string categoryName)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "INSERT OR IGNORE INTO Categories (Name) VALUES ($name)";
+        command.Parameters.AddWithValue("$name", categoryName);
+        command.ExecuteNonQuery();
     }
 
     private static object GetLastInsertId(SqliteConnection connection, SqliteTransaction transaction)

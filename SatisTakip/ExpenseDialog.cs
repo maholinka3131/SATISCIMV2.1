@@ -43,13 +43,22 @@ public sealed class ExpenseDialog : Window
         input.Foreground = Brushes.Gray;
         input.Margin = new Thickness(0, 0, 0, 10);
         input.Padding = new Thickness(8, 6, 8, 6);
-        input.GotFocus += (_, _) => { if (input.Text == placeholder) { input.Clear(); input.Foreground = Brushes.Black; } };
+        input.GotFocus += (_, _) =>
+        {
+            if (input.Text == placeholder)
+            {
+                input.Clear();
+                input.Foreground = Brushes.Black;
+            }
+        };
         panel.Children.Add(input);
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(descriptionBox.Text) || descriptionBox.Text.StartsWith("Örn.") || !decimal.TryParse(amountBox.Text.Replace('.', ','), out var amount) || amount <= 0)
+        if (string.IsNullOrWhiteSpace(descriptionBox.Text) ||
+            descriptionBox.Text == "Örn. elektrik, personel, nakliye" ||
+            !decimal.TryParse(amountBox.Text.Replace('.', ','), out var amount) || amount <= 0)
         {
             MessageBox.Show("Gider açıklaması ve geçerli bir tutar girin.", "Eksik bilgi", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;

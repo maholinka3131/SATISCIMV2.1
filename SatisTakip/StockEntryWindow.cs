@@ -13,10 +13,17 @@ public sealed class StockEntryWindow : Window
     private readonly DatabaseService database;
     private readonly TextBox barcodeBox = new();
     private readonly TextBox quantityBox = new();
+    private readonly TextBox costExcludingVatBox = new();
     private readonly TextBlock productDetails = new();
+    private readonly TextBlock vatRateLabel = new();
+    private readonly TextBlock costIncludingVatText = new();
+    private readonly ComboBox vatRateBox = new();
     private readonly Button addStockButton = new();
     private readonly Button createProductButton = new();
     private Product? selectedProduct;
+
+    public Product? AddedProduct { get; private set; }
+    public bool AddedToExistingProduct { get; private set; }
 
     public StockEntryWindow(ObservableCollection<Product> products, DatabaseService database)
     {
@@ -24,7 +31,7 @@ public sealed class StockEntryWindow : Window
         this.database = database;
         Title = "Barkodla stok girişi";
         Width = 480;
-        Height = 440;
+        Height = 590;
         MinWidth = 420;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
@@ -67,6 +74,26 @@ public sealed class StockEntryWindow : Window
         };
         panel.Children.Add(quantityBox);
 
+        panel.Children.Add(new TextBlock { Text = "Yeni alış maliyeti (KDV hariç; değiştiyse girin)", Margin = new Thickness(0, 14, 0, 4) });
+        costExcludingVatBox.Padding = new Thickness(8, 7, 8, 7);
+        costExcludingVatBox.TextChanged += (_, _) => UpdateCostPreview();
+        panel.Children.Add(costExcludingVatBox);
+
+        vatRateLabel.Text = "KDV oranı (ürün için ilk kez):";
+        vatRateLabel.Margin = new Thickness(0, 10, 0, 4);
+        vatRateLabel.Visibility = Visibility.Collapsed;
+        panel.Children.Add(vatRateLabel);
+        vatRateBox.ItemsSource = new[] { 1m, 10m, 20m };
+        vatRateBox.ItemStringFormat = "{0}%";
+        vatRateBox.Padding = new Thickness(8, 6, 8, 6);
+        vatRateBox.Visibility = Visibility.Collapsed;
+        vatRateBox.SelectionChanged += (_, _) => UpdateCostPreview();
+        panel.Children.Add(vatRateBox);
+
+        costIncludingVatText.Margin = new Thickness(0, 10, 0, 0);
+        costIncludingVatText.FontWeight = FontWeights.SemiBold;
+        panel.Children.Add(costIncludingVatText);
+
         addStockButton.Content = "Stoğa ekle";
         addStockButton.Padding = new Thickness(16, 9, 16, 9);
         addStockButton.Margin = new Thickness(0, 18, 0, 0);
@@ -90,7 +117,12 @@ public sealed class StockEntryWindow : Window
     private void BarcodeBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         selectedProduct = null;
+        costExcludingVatBox.Clear();
+        vatRateBox.SelectedItem = null;
+        vatRateBox.Visibility = Visibility.Collapsed;
+        vatRateLabel.Visibility = Visibility.Collapsed;
         productDetails.Text = "Barkodu okutun; ürün adı ve mevcut stok burada görüntülenir.";
+        costIncludingVatText.Text = "";
         addStockButton.IsEnabled = false;
         createProductButton.IsEnabled = false;
         createProductButton.Visibility = Visibility.Collapsed;
@@ -123,11 +155,15 @@ public sealed class StockEntryWindow : Window
         }
 
         productDetails.Text = $"{selectedProduct.Name}\nBarkod: {selectedProduct.Barcode}\nMevcut stok: {selectedProduct.Stock:N2}";
+        vatRateBox.SelectedItem = selectedProduct.VatRate;
+        vatRateBox.Visibility = selectedProduct.VatRate.HasValue ? Visibility.Collapsed : Visibility.Visible;
+        vatRateLabel.Visibility = selectedProduct.VatRate.HasValue ? Visibility.Collapsed : Visibility.Visible;
         addStockButton.IsEnabled = true;
         createProductButton.IsEnabled = false;
         createProductButton.Visibility = Visibility.Collapsed;
         quantityBox.Focus();
         quantityBox.SelectAll();
+        UpdateCostPreview();
     }
 
     private void CreateProductFromBarcode()
@@ -139,7 +175,15 @@ public sealed class StockEntryWindow : Window
             return;
         }
 
-        var dialog = new ProductDialog(initialBarcode: barcode) { Owner = this };
+        if (!decimal.TryParse(quantityBox.Text.Replace('.', ','), NumberStyles.Number, CultureInfo.CurrentCulture, out var initialStock) || initialStock <= 0)
+        {
+            MessageBox.Show("Yeni ürün için sıfırdan büyük geçerli bir adet girin.", "Geçersiz miktar", MessageBoxButton.OK, MessageBoxImage.Warning);
+            quantityBox.Focus();
+            quantityBox.SelectAll();
+            return;
+        }
+
+        var dialog = new ProductDialog(initialBarcode: barcode, initialStock: initialStock) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Product is not { } newProduct)
         {
             barcodeBox.Focus();
@@ -157,15 +201,8 @@ public sealed class StockEntryWindow : Window
         }
 
         products.Add(newProduct);
-        var createdProductDetails = $"{newProduct.Name}\nBarkod: {newProduct.Barcode}\nİlk stok: {newProduct.Stock:N2}";
-        barcodeBox.Clear();
-        quantityBox.Text = "1";
-        selectedProduct = null;
-        addStockButton.IsEnabled = false;
-        createProductButton.IsEnabled = false;
-        createProductButton.Visibility = Visibility.Collapsed;
-        productDetails.Text = createdProductDetails;
-        barcodeBox.Focus();
+        AddedProduct = newProduct;
+        Close();
     }
 
     private void AddStock()
@@ -183,9 +220,39 @@ public sealed class StockEntryWindow : Window
             return;
         }
 
+        decimal? updatedCostPrice = null;
+        decimal? updatedVatRate = null;
+        var movementNote = "";
+        if (!string.IsNullOrWhiteSpace(costExcludingVatBox.Text))
+        {
+            if (!decimal.TryParse(costExcludingVatBox.Text.Replace('.', ','), NumberStyles.Number, CultureInfo.CurrentCulture, out var costExcludingVat) || costExcludingVat < 0)
+            {
+                MessageBox.Show("Geçerli ve sıfır veya daha büyük bir KDV hariç alış maliyeti girin.", "Geçersiz maliyet", MessageBoxButton.OK, MessageBoxImage.Warning);
+                costExcludingVatBox.Focus();
+                costExcludingVatBox.SelectAll();
+                return;
+            }
+
+            var vatRate = selectedProduct.VatRate;
+            if (!vatRate.HasValue && vatRateBox.SelectedItem is decimal selectedVatRate)
+            {
+                vatRate = selectedVatRate;
+            }
+            if (!vatRate.HasValue)
+            {
+                MessageBox.Show("Bu ürün için KDV oranını seçin.", "KDV oranı gerekli", MessageBoxButton.OK, MessageBoxImage.Warning);
+                vatRateBox.Focus();
+                return;
+            }
+
+            updatedCostPrice = Product.CalculateCostIncludingVat(costExcludingVat, vatRate.Value);
+            updatedVatRate = vatRate;
+            movementNote = $"Alış maliyeti güncellendi: {costExcludingVat:N2} TL + %{vatRate:N0} KDV = {updatedCostPrice:N2} TL";
+        }
+
         try
         {
-            selectedProduct.Stock = database.AddStock(selectedProduct.Barcode, selectedProduct.Name, quantity);
+            selectedProduct.Stock = database.AddStock(selectedProduct.Barcode, selectedProduct.Name, quantity, updatedCostPrice, updatedVatRate, movementNote);
         }
         catch (InvalidOperationException exception)
         {
@@ -198,12 +265,43 @@ public sealed class StockEntryWindow : Window
             return;
         }
 
-        var updatedProductDetails = $"{selectedProduct.Name}\nBarkod: {selectedProduct.Barcode}\nYeni stok: {selectedProduct.Stock:N2}";
-        barcodeBox.Clear();
-        quantityBox.Text = "1";
-        selectedProduct = null;
-        addStockButton.IsEnabled = false;
-        productDetails.Text = updatedProductDetails;
-        barcodeBox.Focus();
+        if (updatedCostPrice.HasValue)
+        {
+            selectedProduct.CostPrice = updatedCostPrice.Value;
+            selectedProduct.VatRate = updatedVatRate ?? selectedProduct.VatRate;
+        }
+        AddedProduct = selectedProduct;
+        AddedToExistingProduct = true;
+        Close();
+    }
+
+    private void UpdateCostPreview()
+    {
+        if (selectedProduct is null)
+        {
+            costIncludingVatText.Text = "";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(costExcludingVatBox.Text))
+        {
+            costIncludingVatText.Text = $"Mevcut KDV dâhil alış maliyeti: {selectedProduct.CostPrice:N2} TL";
+            return;
+        }
+
+        if (!decimal.TryParse(costExcludingVatBox.Text.Replace('.', ','), NumberStyles.Number, CultureInfo.CurrentCulture, out var cost) || cost < 0)
+        {
+            costIncludingVatText.Text = "Geçerli bir maliyet girin.";
+            return;
+        }
+
+        var vatRate = selectedProduct.VatRate;
+        if (!vatRate.HasValue && vatRateBox.SelectedItem is decimal selectedVatRate)
+        {
+            vatRate = selectedVatRate;
+        }
+        costIncludingVatText.Text = vatRate.HasValue
+            ? $"Yeni KDV dâhil maliyet: {Product.CalculateCostIncludingVat(cost, vatRate.Value):N2} TL"
+            : "KDV oranı seçilince KDV dâhil maliyet hesaplanır.";
     }
 }

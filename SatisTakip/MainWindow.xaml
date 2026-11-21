@@ -292,6 +292,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <Grid Grid.Row="0">
@@ -303,7 +304,31 @@
                                 <TextBlock x:Name="ProductCountText" Text="0 ürün" Foreground="{StaticResource Accent}" FontSize="11" FontWeight="SemiBold" />
                             </Border>
                         </Grid>
-                        <Grid Grid.Row="1" Margin="0,16,0,18">
+                        <StackPanel Grid.Row="1" Margin="0,13,0,0">
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Kategoriler" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Ink}" />
+                                    <TextBlock x:Name="CategorySelectionText" Text="Tüm kategoriler" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Kategori Ara" FontSize="10" Foreground="{StaticResource Muted}" Margin="2,0,0,3" />
+                                    <Border BorderBrush="#D7E1E5" BorderThickness="1" CornerRadius="8" Padding="9,0" Background="#FAFCFD" Height="34" Width="155">
+                                        <DockPanel>
+                                            <Path Data="{StaticResource SearchIcon}" Width="13" Height="13" Stretch="Uniform" Stroke="{StaticResource MutedBrush}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" VerticalAlignment="Center" Margin="0,0,7,0" />
+                                            <TextBox x:Name="CategorySearchBox" BorderThickness="0" Background="Transparent" FontSize="11" VerticalContentAlignment="Center" Padding="0,6" TextChanged="CategorySearchBox_TextChanged" ToolTip="Kategori ara" />
+                                        </DockPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+                            <ScrollViewer MaxHeight="82" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <WrapPanel x:Name="CategoryButtonsPanel" />
+                            </ScrollViewer>
+                        </StackPanel>
+                        <Grid Grid.Row="2" Margin="0,12,0,18">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -316,7 +341,7 @@
                             </Border>
                             <Button Grid.Column="1" Content="↥  Excel" Margin="12,0,0,0" Padding="15,0" Click="ImportExcelButton_Click" Style="{StaticResource RoundedButton}" Background="#EAF3F5" Foreground="{StaticResource Accent}" BorderBrush="#C9DDE2" />
                         </Grid>
-                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
                             <ItemsControl x:Name="ProductButtons" HorizontalContentAlignment="Stretch">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
@@ -325,9 +350,11 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Button Style="{StaticResource ProductButton}" Tag="{Binding}" Click="ProductButton_Click" Width="158" Height="116">
+                                        <Button Style="{StaticResource ProductButton}" Tag="{Binding}" Click="ProductButton_Click" Width="170" Height="116">
                                             <Button.ContextMenu>
                                                 <ContextMenu>
+                                                    <MenuItem Header="Kategoriyi değiştir" Click="ChangeProductCategoryMenuItem_Click" />
+                                                    <Separator />
                                                     <MenuItem Header="Ürünü düzenle" Click="EditProductMenuItem_Click" />
                                                     <MenuItem Header="Ürünü katalogdan sil" Click="DeleteProductMenuItem_Click" />
                                                 </ContextMenu>
@@ -341,8 +368,18 @@
                                                     <Border Grid.Column="0" HorizontalAlignment="Stretch" Background="#EAF3F5" CornerRadius="5" Padding="5,3" MaxWidth="95">
                                                         <TextBlock Text="{Binding Category}" Foreground="{StaticResource Accent}" FontSize="9" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                     </Border>
-                                                    <Border Grid.Column="1" HorizontalAlignment="Right" Background="#F1F5F7" CornerRadius="5" Padding="5,3" Margin="4,0,0,0">
-                                                        <TextBlock Foreground="{StaticResource Muted}" FontSize="9" FontWeight="SemiBold">
+                                                    <Border Grid.Column="1" HorizontalAlignment="Right" Background="#F1F5F7" CornerRadius="5" Padding="6,3" Margin="4,0,0,0">
+                                                        <TextBlock FontSize="9" FontWeight="SemiBold">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="#16A34A" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsLowStock}" Value="True">
+                                                                            <Setter Property="Foreground" Value="#DC2626" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
                                                             <Run Text="Stok " />
                                                             <Run Text="{Binding Stock, StringFormat={}{0:0.##}}" />
                                                         </TextBlock>

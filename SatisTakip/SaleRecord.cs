@@ -32,7 +32,9 @@ public sealed class SaleItemRecord
             if (CardAmount > 0) payments.Add($"Kart {CardAmount:N2} TL");
             return payments.Count > 0
                 ? string.Join(" + ", payments)
-                : PaymentMethod == "Karma" ? "Dağılım kaydedilmemiş" : PaymentMethod;
+                : PaymentMethod == "Karma"
+                    ? "Dağılım kaydedilmemiş"
+                    : PaymentMethod;
         }
     }
     public string ProductName { get; init; } = "";

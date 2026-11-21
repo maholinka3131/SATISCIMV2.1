@@ -20,6 +20,7 @@ public sealed class StockMovement
     public string ProductName { get; init; } = "";
     public DateTime Date { get; init; }
     public string Type { get; init; } = "";
+    public string TypeDisplay => Type;
     public decimal Quantity { get; init; }
     public decimal PreviousStock { get; init; }
     public decimal NewStock { get; init; }
