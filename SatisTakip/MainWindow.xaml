@@ -212,6 +212,7 @@
                     <Button Content="Kasa" Tag="Active" CommandParameter="{StaticResource CashIcon}" Style="{StaticResource NavButton}" />
                     <Button x:Name="ProductsNavButton" Content="Ürünler" CommandParameter="{StaticResource ProductsMenuIcon}" Style="{StaticResource NavButton}" Click="ProductsButton_Click" />
                     <Button x:Name="StockEntryNavButton" Content="Stok girişi (barkod)" CommandParameter="{StaticResource StockMenuIcon}" Style="{StaticResource NavButton}" Click="StockEntryButton_Click" />
+                    <Button x:Name="ExpirationStockNavButton" Content="SKT / adet tanımla" CommandParameter="{StaticResource WarningMenuIcon}" Style="{StaticResource NavButton}" Click="ExpirationStockButton_Click" />
                     <Button x:Name="StockAlertsNavButton" Content="Kritik stok" CommandParameter="{StaticResource WarningMenuIcon}" Style="{StaticResource NavButton}" Click="StockAlertsButton_Click" />
                     <Button x:Name="StockMovementsNavButton" Content="Stok hareketleri" CommandParameter="{StaticResource MovementMenuIcon}" Style="{StaticResource NavButton}" Click="StockMovementsButton_Click" />
                     <Button x:Name="ImportExcelNavButton" Content="Excel'den Aktar" CommandParameter="{StaticResource ImportMenuIcon}" Style="{StaticResource NavButton}" Click="ImportExcelButton_Click" />

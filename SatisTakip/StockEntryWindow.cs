@@ -14,6 +14,8 @@ public sealed class StockEntryWindow : Window
     private readonly TextBox barcodeBox = new();
     private readonly TextBox quantityBox = new();
     private readonly TextBox costExcludingVatBox = new();
+    private readonly DatePicker expirationDatePicker = new();
+    private readonly TextBlock expirationDateLabel = new();
     private readonly TextBlock productDetails = new();
     private readonly TextBlock vatRateLabel = new();
     private readonly TextBlock costIncludingVatText = new();
@@ -31,7 +33,7 @@ public sealed class StockEntryWindow : Window
         this.database = database;
         Title = "Barkodla stok girişi";
         Width = 480;
-        Height = 590;
+        Height = 640;
         MinWidth = 420;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
@@ -73,6 +75,13 @@ public sealed class StockEntryWindow : Window
             }
         };
         panel.Children.Add(quantityBox);
+
+        expirationDateLabel.Text = "Son kullanma tarihi";
+        expirationDateLabel.Margin = new Thickness(0, 14, 0, 4);
+        panel.Children.Add(expirationDateLabel);
+        expirationDatePicker.SelectedDateFormat = DatePickerFormat.Short;
+        expirationDatePicker.Padding = new Thickness(8, 6, 8, 6);
+        panel.Children.Add(expirationDatePicker);
 
         panel.Children.Add(new TextBlock { Text = "Yeni alış maliyeti (KDV hariç; değiştiyse girin)", Margin = new Thickness(0, 14, 0, 4) });
         costExcludingVatBox.Padding = new Thickness(8, 7, 8, 7);
@@ -118,6 +127,7 @@ public sealed class StockEntryWindow : Window
     {
         selectedProduct = null;
         costExcludingVatBox.Clear();
+        expirationDatePicker.SelectedDate = null;
         vatRateBox.SelectedItem = null;
         vatRateBox.Visibility = Visibility.Collapsed;
         vatRateLabel.Visibility = Visibility.Collapsed;
@@ -155,6 +165,9 @@ public sealed class StockEntryWindow : Window
         }
 
         productDetails.Text = $"{selectedProduct.Name}\nBarkod: {selectedProduct.Barcode}\nMevcut stok: {selectedProduct.Stock:N2}";
+        expirationDateLabel.Text = selectedProduct.Stock <= 0
+            ? "Son kullanma tarihi (ilk stok girişi için zorunlu)"
+            : "Son kullanma tarihi (isteğe bağlı)";
         vatRateBox.SelectedItem = selectedProduct.VatRate;
         vatRateBox.Visibility = selectedProduct.VatRate.HasValue ? Visibility.Collapsed : Visibility.Visible;
         vatRateLabel.Visibility = selectedProduct.VatRate.HasValue ? Visibility.Collapsed : Visibility.Visible;
@@ -252,7 +265,7 @@ public sealed class StockEntryWindow : Window
 
         try
         {
-            selectedProduct.Stock = database.AddStock(selectedProduct.Barcode, selectedProduct.Name, quantity, updatedCostPrice, updatedVatRate, movementNote);
+            selectedProduct.Stock = database.AddStock(selectedProduct.Barcode, selectedProduct.Name, quantity, updatedCostPrice, updatedVatRate, movementNote, expirationDatePicker.SelectedDate);
         }
         catch (InvalidOperationException exception)
         {

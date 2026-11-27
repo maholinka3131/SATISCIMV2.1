@@ -50,16 +50,19 @@ Ilk sayfanin ilk satiri baslik olarak atlanir. Sutunlar su sirada olmali:
 5. Alis maliyeti
 6. Stok miktari (istege bagli)
 7. Kritik stok esigi (istege bagli, varsayilan 5)
+8. Son kullanma tarihi (istege bagli; ilk stok girisinde zorunlu)
 
 Ornek:
 
-| Barkod | Urun adi | Kategori | Satis fiyati | Alis maliyeti | Stok | Kritik stok esigi |
-|---|---|---|---:|---:|---:|---:|
-| 1001 | Tam Yagli Sut | Sut Urunleri | 32,50 | 24,00 | 12 | 5 |
+| Barkod | Urun adi | Kategori | Satis fiyati | Alis maliyeti | Stok | Kritik stok esigi | Son kullanma tarihi |
+|---|---|---|---:|---:|---:|---:|---|
+| 1001 | Tam Yagli Sut | Sut Urunleri | 32,50 | 24,00 | 12 | 5 | 31.12.2026 |
 
 Excel aktarimindaki `Alis maliyeti` dogrudan kaydedilir ve mevcut formatta KDV orani aktarilmaz; KDV oranini sonradan urun duzenleme ekranindan tanimlayabilirsiniz.
 
 Urun ekleme ve duzenleme ekraninda alis maliyeti KDV haric girilir. `%1`, `%10` veya `%20` KDV orani secildiginde KDV dahil alis maliyeti otomatik hesaplanir ve bu tutar urunun maliyeti olarak kullanilir. Barkodla stok girisinde maliyet alani bos birakilirsa mevcut maliyet korunur; yeni maliyet girilirse urunun kayitli KDV oraniyla hesaplanir. Eski urunlerde KDV orani kayitli olmadigindan, ilk maliyet guncellemesinde oran secilmelidir. Satis fiyati bu hesaplamayla otomatik degismez.
+
+Ilk stok girisinde SKT zorunludur. Mevcut urunlerin SKT ve adet bilgileri `SKT / adet tanimla` ekranindan, SKT tanimlanmamis stok miktari kadar eklenebilir. Satislar en yakin SKT'li partiden dusulur; uygulama acilisinda yalnizca SKT'sine 5 gun veya daha az kalan ve hala stokta olan partiler uyarilir.
 
 ## Release cikti
 

@@ -151,8 +151,8 @@ public sealed class ProductListWindow : Window
         var dialog = new ProductDialog { Owner = this };
         if (dialog.ShowDialog() == true && dialog.Product is not null)
         {
-            products.Add(dialog.Product);
             database.SaveProduct(dialog.Product);
+            products.Add(dialog.Product);
             AddedProduct = dialog.Product;
             DialogResult = true;
         }
@@ -177,6 +177,7 @@ public sealed class ProductListWindow : Window
             product.Price = dialog.Product.Price;
             product.Stock = dialog.Product.Stock;
             product.MinimumStock = dialog.Product.MinimumStock;
+            product.StockAdditionExpirationDate = dialog.Product.StockAdditionExpirationDate;
             database.SaveProduct(product);
             productGrid.Items.Refresh();
         }

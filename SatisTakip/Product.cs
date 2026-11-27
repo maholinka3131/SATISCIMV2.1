@@ -11,6 +11,7 @@ public sealed class Product
     public decimal Price { get; set; }
     public decimal Stock { get; set; }
     public decimal MinimumStock { get; set; } = 5;
+    public DateTime? StockAdditionExpirationDate { get; set; }
     public bool IsLowStock => Stock <= MinimumStock;
     public string CostPriceText => $"{CostPrice:N2} TL";
     public string PriceText => $"{Price:N2} TL";

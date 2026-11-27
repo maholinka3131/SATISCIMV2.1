@@ -1,5 +1,5 @@
 {
-  "Version": "1.0.7",
-  "DownloadUrl": "https://github.com/maholinka3131/SATISCIMV2.1/releases/download/v1.0.7/SATISCIM-Setup-1.0.7.exe",
-  "Notes": "Ürünlere %1, %10 ve %20 KDV oranı tanımlama ve KDV dahil alış maliyeti hesaplama eklendi. Kategori yönetimi ve kasada kategori filtreleme geliştirildi; ürün ve stok işlemlerinde iyileştirmeler yapıldı."
+  "Version": "1.0.8",
+  "DownloadUrl": "https://github.com/maholinka3131/SATISCIMV2.1/releases/download/v1.0.8/SATISCIM-Setup-1.0.8.exe",
+  "Notes": "SKT'li stok partisi takibi eklendi. İlk stok girişinde SKT zorunlu; mevcut stoğa SKT ve adet tanımlanabiliyor. Satışlar SKT'si en yakın partiden düşüyor, kalan miktar varsa SKT'ye 5 gün kala uyarı veriliyor. İadelerde parti miktarı geri yükleniyor."
 }

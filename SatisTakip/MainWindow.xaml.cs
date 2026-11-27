@@ -24,9 +24,11 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<Expense> expenses = new();
     private readonly DatabaseService database;
     private readonly System.Windows.Threading.DispatcherTimer barcodeScanTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private readonly System.Windows.Threading.DispatcherTimer expirationWarningTimer = new() { Interval = TimeSpan.FromHours(12) };
     private CartItem? selectedCartItem;
     private string? selectedCategory;
     private decimal openingCash;
+    private DateTime lastExpirationWarningDate = DateTime.MinValue;
 
     private const int WmGetMinMaxInfo = 0x0024;
     private const uint MonitorDefaultToNearest = 2;
@@ -111,6 +113,8 @@ public partial class MainWindow : Window
     {
         SearchBox.Focus();
         Keyboard.Focus(SearchBox);
+        ShowExpirationWarnings();
+        expirationWarningTimer.Start();
 
         var update = await new UpdateService().CheckAsync();
         var currentVersion = Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(1, 0, 0);
@@ -131,6 +135,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         VersionText.Text = $"Sürüm {Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "Bilinmiyor"}";
         barcodeScanTimer.Tick += BarcodeScanTimer_Tick;
+        expirationWarningTimer.Tick += (_, _) => ShowExpirationWarnings();
+        Closed += (_, _) => expirationWarningTimer.Stop();
         database = new DatabaseService();
         ConfigurePermissions();
         database.RemoveTemporaryProductsOnce();
@@ -434,7 +440,7 @@ public partial class MainWindow : Window
         FinancialSummaryPanel.Visibility = isAdmin ? Visibility.Visible : Visibility.Collapsed;
         foreach (var control in new Control[]
         {
-            ProductsNavButton, StockEntryNavButton, StockMovementsNavButton, ImportExcelNavButton,
+            ProductsNavButton, StockEntryNavButton, ExpirationStockNavButton, StockMovementsNavButton, ImportExcelNavButton,
             ExpensesNavButton, SalesHistoryNavButton, ReportsNavButton, DayEndNavButton,
             BackupNavButton, RestoreNavButton, UserManagementNavButton, AdminSettingsNavButton,
             OpeningCashBox, StartDayButton, AddExpenseTopButton, DayEndTopButton, AddProductTopButton
@@ -717,8 +723,8 @@ public partial class MainWindow : Window
         ReloadCategories();
         if (result == true && dialog.Product is not null)
         {
-            products.Add(dialog.Product);
             database.SaveProduct(dialog.Product);
+            products.Add(dialog.Product);
             RefreshProductList();
             SearchBox.Clear();
             MessageBox.Show(this,
@@ -750,6 +756,7 @@ public partial class MainWindow : Window
             product.Price = dialog.Product.Price;
             product.Stock = dialog.Product.Stock;
             product.MinimumStock = dialog.Product.MinimumStock;
+            product.StockAdditionExpirationDate = dialog.Product.StockAdditionExpirationDate;
             database.SaveProduct(product);
             RefreshProductList();
             UpdateTotals();
@@ -819,6 +826,45 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
+    }
+
+    private void ExpirationStockButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireAdmin()) return;
+        var window = new ExpirationStockWindow(products, database) { Owner = this };
+        window.ShowDialog();
+    }
+
+    private void ShowExpirationWarnings()
+    {
+        var today = DateTime.Today;
+        if (lastExpirationWarningDate == today)
+        {
+            return;
+        }
+        var expiringBatches = database.LoadExpiringBatches(today.AddDays(5));
+        if (expiringBatches.Count == 0)
+        {
+            return;
+        }
+
+        lastExpirationWarningDate = today;
+        var details = expiringBatches.Select(batch =>
+        {
+            var expirationDate = batch.ExpirationDate.Date;
+            var daysRemaining = (expirationDate - today).Days;
+            var status = daysRemaining < 0
+                ? $"{Math.Abs(daysRemaining)} gün önce tarihi geçti"
+                : daysRemaining == 0
+                    ? "bugün son günü"
+                    : $"{daysRemaining} gün kaldı";
+            return $"• {batch.ProductName} — {batch.Quantity:N2} adet — {expirationDate:d} ({status})";
+        });
+        MessageBox.Show(this,
+            "Son kullanma tarihi yaklaşan veya geçmiş, stoğu kalan ürün partileri:\n\n" + string.Join("\n", details),
+            "Son kullanma tarihi uyarısı",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
     }
 
     private void AddExpenseButton_Click(object sender, RoutedEventArgs e)
@@ -994,6 +1040,10 @@ public partial class MainWindow : Window
                 var barcode = row.Cell(1).GetString().Trim();
                 var existing = products.FirstOrDefault(product => product.Barcode == barcode && barcode.Length > 0);
                 var minimumStockText = row.Cell(7).GetString().Trim().Replace('.', ',');
+                var expirationText = row.Cell(8).GetString().Trim();
+                DateTime? expirationDate = DateTime.TryParse(expirationText, out var parsedExpirationDate)
+                    ? parsedExpirationDate.Date
+                    : null;
                 if (existing is not null)
                 {
                     existing.Name = name;
@@ -1001,6 +1051,7 @@ public partial class MainWindow : Window
                     existing.CostPrice = cost;
                     existing.Price = price;
                     existing.Stock = (decimal)row.Cell(6).GetDouble();
+                    existing.StockAdditionExpirationDate = expirationDate;
                     if (decimal.TryParse(minimumStockText, out var minimumStock) && minimumStock >= 0)
                     {
                         existing.MinimumStock = minimumStock;
@@ -1009,13 +1060,22 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    var product = new Product { Barcode = barcode, Name = name, Category = row.Cell(3).GetString().Trim(), CostPrice = cost, Price = price, Stock = (decimal)row.Cell(6).GetDouble() };
+                    var product = new Product
+                    {
+                        Barcode = barcode,
+                        Name = name,
+                        Category = row.Cell(3).GetString().Trim(),
+                        CostPrice = cost,
+                        Price = price,
+                        Stock = (decimal)row.Cell(6).GetDouble(),
+                        StockAdditionExpirationDate = expirationDate
+                    };
                     if (decimal.TryParse(minimumStockText, out var minimumStock) && minimumStock >= 0)
                     {
                         product.MinimumStock = minimumStock;
                     }
-                    products.Add(product);
                     database.SaveProduct(product);
+                    products.Add(product);
                 }
                 imported++;
             }
@@ -1025,7 +1085,7 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.Show($"Excel dosyası okunamadı.\n{exception.Message}", "Aktarım hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Excel aktarımı tamamlanamadı.\n{exception.Message}", "Aktarım hatası", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

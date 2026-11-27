@@ -14,6 +14,7 @@ public sealed class ProductDialog : Window
     private readonly TextBox costExcludingVatBox = new();
     private readonly TextBox stockBox = new();
     private readonly TextBox minimumStockBox = new();
+    private readonly DatePicker expirationDatePicker = new();
     private readonly ComboBox vatRateBox = new();
     private readonly TextBlock costIncludingVatText = new();
     private readonly DatabaseService database = new();
@@ -29,8 +30,8 @@ public sealed class ProductDialog : Window
         originalBarcode = product?.Barcode ?? "";
         Title = product is null ? "Yeni ürün" : "Ürünü düzenle";
         Width = 380;
-        Height = 700;
-        MinHeight = 660;
+        Height = 750;
+        MinHeight = 710;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
         Background = System.Windows.Media.Brushes.White;
@@ -68,6 +69,19 @@ public sealed class ProductDialog : Window
         panel.Children.Add(costIncludingVatText);
         AddField(panel, "Satış fiyatı (TL)", priceBox);
         AddField(panel, "Stok miktarı", stockBox);
+        panel.Children.Add(new TextBlock
+        {
+            Text = product is null
+                ? "Son kullanma tarihi (stok giriliyorsa zorunlu)"
+                : "Artırılan stokun son kullanma tarihi (isteğe bağlı)",
+            FontSize = 12,
+            Foreground = System.Windows.Media.Brushes.Gray,
+            Margin = new Thickness(0, 0, 0, 4)
+        });
+        expirationDatePicker.SelectedDateFormat = DatePickerFormat.Short;
+        expirationDatePicker.Margin = new Thickness(0, 0, 0, 10);
+        expirationDatePicker.Padding = new Thickness(8, 6, 8, 6);
+        panel.Children.Add(expirationDatePicker);
         AddField(panel, "Kritik stok eşiği", minimumStockBox);
 
         if (product is not null)
@@ -230,6 +244,15 @@ public sealed class ProductDialog : Window
             return;
         }
 
+        if (stock > 0 &&
+            (existingProduct is null || existingProduct.Stock == 0) &&
+            !expirationDatePicker.SelectedDate.HasValue)
+        {
+            MessageBox.Show("İlk stok girişi için son kullanma tarihini girin.", "Son kullanma tarihi gerekli", MessageBoxButton.OK, MessageBoxImage.Warning);
+            expirationDatePicker.Focus();
+            return;
+        }
+
         var barcode = barcodeBox.Text.Trim();
         if (database.IsBarcodeInUse(barcode, originalBarcode))
         {
@@ -246,7 +269,8 @@ public sealed class ProductDialog : Window
             VatRate = vatRate,
             Price = price,
             Stock = stock,
-            MinimumStock = minimumStock
+            MinimumStock = minimumStock,
+            StockAdditionExpirationDate = expirationDatePicker.SelectedDate?.Date
         };
         DialogResult = true;
     }

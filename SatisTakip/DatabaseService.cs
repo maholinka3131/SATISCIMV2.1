@@ -108,10 +108,29 @@ public sealed class DatabaseService
                 Username TEXT NOT NULL DEFAULT '',
                 FOREIGN KEY(ProductId) REFERENCES Products(Id)
             );
+            CREATE TABLE IF NOT EXISTS ProductExpirationBatches (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ProductId INTEGER NOT NULL,
+                ExpirationDate TEXT NOT NULL,
+                Quantity REAL NOT NULL CHECK(Quantity >= 0),
+                UNIQUE(ProductId, ExpirationDate),
+                FOREIGN KEY(ProductId) REFERENCES Products(Id)
+            );
+            CREATE TABLE IF NOT EXISTS SaleItemExpirationBatchAllocations (
+                SaleItemId INTEGER NOT NULL,
+                BatchId INTEGER NOT NULL,
+                Quantity REAL NOT NULL,
+                ReturnedQuantity REAL NOT NULL DEFAULT 0,
+                PRIMARY KEY(SaleItemId, BatchId),
+                FOREIGN KEY(SaleItemId) REFERENCES SaleItems(Id),
+                FOREIGN KEY(BatchId) REFERENCES ProductExpirationBatches(Id)
+            );
             """;
         command.ExecuteNonQuery();
         EnsureCategories();
         EnsureProductMinimumStockColumn();
+        EnsureProductExpirationDateColumn();
+        MigrateProductExpirationDatesToBatches();
         EnsureProductVatRateColumn();
         EnsureSalesPaymentColumns();
         EnsureSaleItemReturnColumn();
@@ -168,6 +187,39 @@ public sealed class DatabaseService
         using var alter = connection.CreateCommand();
         alter.CommandText = "ALTER TABLE Products ADD COLUMN VatRate REAL NULL";
         alter.ExecuteNonQuery();
+    }
+
+    private void EnsureProductExpirationDateColumn()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info(Products)";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.GetString(1) == "ExpirationDate")
+            {
+                return;
+            }
+        }
+
+        reader.Close();
+        using var alter = connection.CreateCommand();
+        alter.CommandText = "ALTER TABLE Products ADD COLUMN ExpirationDate TEXT NULL";
+        alter.ExecuteNonQuery();
+    }
+
+    private void MigrateProductExpirationDatesToBatches()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT OR IGNORE INTO ProductExpirationBatches (ProductId, ExpirationDate, Quantity)
+            SELECT Id, ExpirationDate, Stock
+            FROM Products
+            WHERE ExpirationDate IS NOT NULL AND Stock > 0
+            """;
+        command.ExecuteNonQuery();
     }
 
     private void EnsureSalesPaymentColumns()
@@ -254,6 +306,146 @@ public sealed class DatabaseService
             categories.Add(reader.GetString(0));
         }
         return categories;
+    }
+
+    public List<ProductExpirationBatch> LoadExpirationBatches(long productId)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT ProductExpirationBatches.Id, ProductExpirationBatches.ProductId,
+                   Products.Name, Products.Barcode, ProductExpirationBatches.ExpirationDate,
+                   ProductExpirationBatches.Quantity
+            FROM ProductExpirationBatches
+            JOIN Products ON Products.Id = ProductExpirationBatches.ProductId
+            WHERE ProductExpirationBatches.ProductId = $productId
+              AND ProductExpirationBatches.Quantity > 0
+            ORDER BY ProductExpirationBatches.ExpirationDate, ProductExpirationBatches.Id
+            """;
+        command.Parameters.AddWithValue("$productId", productId);
+        using var reader = command.ExecuteReader();
+        var result = new List<ProductExpirationBatch>();
+        while (reader.Read())
+        {
+            result.Add(new ProductExpirationBatch
+            {
+                Id = reader.GetInt64(0),
+                ProductId = reader.GetInt64(1),
+                ProductName = reader.GetString(2),
+                Barcode = reader.GetString(3),
+                ExpirationDate = DateTime.ParseExact(reader.GetString(4), "yyyy-MM-dd", CultureInfo.InvariantCulture),
+                Quantity = ReadDecimal(reader, 5)
+            });
+        }
+        return result;
+    }
+
+    public List<ProductExpirationBatch> LoadExpiringBatches(DateTime throughDate)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT ProductExpirationBatches.Id, ProductExpirationBatches.ProductId,
+                   Products.Name, Products.Barcode, ProductExpirationBatches.ExpirationDate,
+                   ProductExpirationBatches.Quantity
+            FROM ProductExpirationBatches
+            JOIN Products ON Products.Id = ProductExpirationBatches.ProductId
+            WHERE Products.IsActive = 1
+              AND ProductExpirationBatches.Quantity > 0
+              AND ProductExpirationBatches.ExpirationDate <= $throughDate
+            ORDER BY ProductExpirationBatches.ExpirationDate, Products.Name
+            """;
+        command.Parameters.AddWithValue("$throughDate", throughDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        using var reader = command.ExecuteReader();
+        var result = new List<ProductExpirationBatch>();
+        while (reader.Read())
+        {
+            result.Add(new ProductExpirationBatch
+            {
+                Id = reader.GetInt64(0),
+                ProductId = reader.GetInt64(1),
+                ProductName = reader.GetString(2),
+                Barcode = reader.GetString(3),
+                ExpirationDate = DateTime.ParseExact(reader.GetString(4), "yyyy-MM-dd", CultureInfo.InvariantCulture),
+                Quantity = ReadDecimal(reader, 5)
+            });
+        }
+        return result;
+    }
+
+    public void AddExpirationStock(long productId, DateTime expirationDate, decimal quantity)
+    {
+        if (quantity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantity), "SKT'ye bağlanacak adet sıfırdan büyük olmalıdır.");
+        }
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        decimal stock;
+        using (var product = connection.CreateCommand())
+        {
+            product.Transaction = transaction;
+            product.CommandText = "SELECT Stock FROM Products WHERE Id = $id AND IsActive = 1";
+            product.Parameters.AddWithValue("$id", productId);
+            var value = product.ExecuteScalar();
+            if (value is null)
+            {
+                throw new InvalidOperationException("Etkin ürün bulunamadı.");
+            }
+            stock = Convert.ToDecimal(value, CultureInfo.InvariantCulture);
+        }
+
+        decimal assignedQuantity;
+        using (var assigned = connection.CreateCommand())
+        {
+            assigned.Transaction = transaction;
+            assigned.CommandText = "SELECT COALESCE(SUM(Quantity), 0) FROM ProductExpirationBatches WHERE ProductId = $id";
+            assigned.Parameters.AddWithValue("$id", productId);
+            assignedQuantity = Convert.ToDecimal(assigned.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+
+        var availableQuantity = stock - assignedQuantity;
+        if (quantity > availableQuantity)
+        {
+            throw new InvalidOperationException($"SKT'ye bağlanabilecek en fazla miktar {Math.Max(availableQuantity, 0):N2} adettir. Bu ürünün {stock:N2} adedinden {assignedQuantity:N2} adedi zaten SKT ile eşleştirilmiş.");
+        }
+
+        AddExpirationBatch(connection, transaction, productId, expirationDate, quantity);
+        transaction.Commit();
+    }
+
+    public void UnassignExpirationStock(long productId, long batchId)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE ProductExpirationBatches
+            SET Quantity = 0
+            WHERE Id = $batchId AND ProductId = $productId AND Quantity > 0
+            """;
+        command.Parameters.AddWithValue("$batchId", batchId);
+        command.Parameters.AddWithValue("$productId", productId);
+        if (command.ExecuteNonQuery() != 1)
+        {
+            throw new InvalidOperationException("Kaldırılacak etkin SKT kaydı bulunamadı.");
+        }
+    }
+
+    private static void AddExpirationBatch(SqliteConnection connection, SqliteTransaction transaction, long productId, DateTime expirationDate, decimal quantity)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO ProductExpirationBatches (ProductId, ExpirationDate, Quantity)
+            VALUES ($productId, $date, $quantity)
+            ON CONFLICT(ProductId, ExpirationDate)
+            DO UPDATE SET Quantity = ProductExpirationBatches.Quantity + excluded.Quantity
+            """;
+        command.Parameters.AddWithValue("$productId", productId);
+        command.Parameters.AddWithValue("$date", expirationDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$quantity", quantity);
+        command.ExecuteNonQuery();
     }
 
     public void SaveCategory(string name)
@@ -435,6 +627,15 @@ public sealed class DatabaseService
             }
         }
 
+        if (product.Stock > 0 && existingId == 0 && !product.StockAdditionExpirationDate.HasValue)
+        {
+            throw new InvalidOperationException("İlk stok girişi için son kullanma tarihi zorunludur.");
+        }
+        if (product.Stock > previousStock && previousStock == 0 && !product.StockAdditionExpirationDate.HasValue)
+        {
+            throw new InvalidOperationException("Stoğu sıfır olan ürüne ilk stok girişi için son kullanma tarihi zorunludur.");
+        }
+
         using var save = connection.CreateCommand();
         save.Transaction = transaction;
         save.CommandText = existingId > 0
@@ -465,12 +666,22 @@ public sealed class DatabaseService
         if (existingId > 0 && previousStock != product.Stock)
         {
             RecordStockMovement(connection, transaction, product.Id, product.Name, "Stok düzeltme", product.Stock - previousStock, previousStock, product.Stock, "Ürün kaydından yapılan stok değişikliği");
+            if (product.Stock > previousStock && product.StockAdditionExpirationDate.HasValue)
+            {
+                AddExpirationBatch(connection, transaction, product.Id, product.StockAdditionExpirationDate.Value, product.Stock - previousStock);
+            }
+            else if (product.Stock < previousStock)
+            {
+                ConsumeExpirationBatches(connection, transaction, product.Id, previousStock - product.Stock);
+            }
         }
         else if (existingId == 0 && product.Stock > 0)
         {
             RecordStockMovement(connection, transaction, product.Id, product.Name, "İlk stok", product.Stock, 0, product.Stock, "Ürün ilk kez kaydedildi");
+            AddExpirationBatch(connection, transaction, product.Id, product.StockAdditionExpirationDate!.Value, product.Stock);
         }
         transaction.Commit();
+        product.StockAdditionExpirationDate = null;
     }
 
     public bool IsBarcodeInUse(string barcode, string? currentBarcode = null)
@@ -515,7 +726,7 @@ public sealed class DatabaseService
         return nextBarcode;
     }
 
-    public decimal AddStock(string barcode, string productName, decimal quantity, decimal? newCostPrice = null, decimal? vatRate = null, string note = "")
+    public decimal AddStock(string barcode, string productName, decimal quantity, decimal? newCostPrice = null, decimal? vatRate = null, string note = "", DateTime? expirationDate = null)
     {
         if (quantity <= 0)
         {
@@ -560,6 +771,12 @@ public sealed class DatabaseService
             existingVatRate = reader.IsDBNull(2) ? null : ReadDecimal(reader, 2);
         }
 
+        if (previousStock == 0 && !expirationDate.HasValue)
+        {
+            transaction.Rollback();
+            throw new InvalidOperationException("Stoğu sıfır olan ürüne ilk stok girişi için son kullanma tarihi zorunludur.");
+        }
+
         var effectiveVatRate = vatRate ?? existingVatRate;
         if (newCostPrice.HasValue && effectiveVatRate is null)
         {
@@ -597,6 +814,10 @@ public sealed class DatabaseService
             updatedStock = Convert.ToDecimal(query.ExecuteScalar(), CultureInfo.InvariantCulture);
         }
         RecordStockMovement(connection, transaction, productId, productName, "Stok girişi", quantity, previousStock, updatedStock, note);
+        if (expirationDate.HasValue)
+        {
+            AddExpirationBatch(connection, transaction, productId, expirationDate.Value, quantity);
+        }
         transaction.Commit();
         return updatedStock;
     }
@@ -822,6 +1043,7 @@ public sealed class DatabaseService
             }
         }
         UpdateProductStock(connection, transaction, productId, productName, quantityToReturn);
+        RestoreExpirationBatches(connection, transaction, saleItemId, quantityToReturn);
         MarkSaleRefundedIfComplete(connection, transaction, saleId);
         transaction.Commit();
         return true;
@@ -862,6 +1084,7 @@ public sealed class DatabaseService
             if (updateItem.ExecuteNonQuery() == 1)
             {
                 UpdateProductStock(connection, transaction, update.ProductId, update.ProductName, update.Quantity);
+                RestoreExpirationBatches(connection, transaction, update.SaleItemId, update.Quantity);
             }
         }
         MarkSaleRefundedIfComplete(connection, transaction, saleId);
@@ -938,7 +1161,9 @@ public sealed class DatabaseService
                 throw new InvalidOperationException($"'{item.Name}' ürünü artık etkin değil; satış kaydedilemedi.");
             }
 
+            var saleItemId = Convert.ToInt64(GetLastInsertId(connection, transaction), CultureInfo.InvariantCulture);
             ApplyStockChange(connection, transaction, item.Product.Id, item.Name, -item.Quantity, "Satış", $"Satış no: {saleId}");
+            ConsumeExpirationBatches(connection, transaction, item.Product.Id, item.Quantity, saleItemId);
         }
 
         transaction.Commit();
@@ -1392,6 +1617,109 @@ public sealed class DatabaseService
             }
         }
         RecordStockMovement(connection, transaction, productId, productName, type, quantity, previousStock, newStock, note);
+    }
+
+    private static void ConsumeExpirationBatches(SqliteConnection connection, SqliteTransaction transaction, long productId, decimal quantity, long? saleItemId = null)
+    {
+        var batches = new List<(long Id, decimal Quantity)>();
+        using (var query = connection.CreateCommand())
+        {
+            query.Transaction = transaction;
+            query.CommandText = "SELECT Id, Quantity FROM ProductExpirationBatches WHERE ProductId = $productId AND Quantity > 0 ORDER BY ExpirationDate, Id";
+            query.Parameters.AddWithValue("$productId", productId);
+            using var reader = query.ExecuteReader();
+            while (reader.Read())
+            {
+                batches.Add((reader.GetInt64(0), ReadDecimal(reader, 1)));
+            }
+        }
+
+        var remaining = quantity;
+        foreach (var batch in batches)
+        {
+            if (remaining <= 0)
+            {
+                break;
+            }
+
+            var consumed = Math.Min(remaining, batch.Quantity);
+            using (var update = connection.CreateCommand())
+            {
+                update.Transaction = transaction;
+                update.CommandText = "UPDATE ProductExpirationBatches SET Quantity = Quantity - $quantity WHERE Id = $id";
+                update.Parameters.AddWithValue("$quantity", consumed);
+                update.Parameters.AddWithValue("$id", batch.Id);
+                update.ExecuteNonQuery();
+            }
+            if (saleItemId.HasValue)
+            {
+                using var allocation = connection.CreateCommand();
+                allocation.Transaction = transaction;
+                allocation.CommandText = """
+                    INSERT INTO SaleItemExpirationBatchAllocations (SaleItemId, BatchId, Quantity)
+                    VALUES ($saleItemId, $batchId, $quantity)
+                    """;
+                allocation.Parameters.AddWithValue("$saleItemId", saleItemId.Value);
+                allocation.Parameters.AddWithValue("$batchId", batch.Id);
+                allocation.Parameters.AddWithValue("$quantity", consumed);
+                allocation.ExecuteNonQuery();
+            }
+            remaining -= consumed;
+        }
+    }
+
+    private static void RestoreExpirationBatches(SqliteConnection connection, SqliteTransaction transaction, long saleItemId, decimal quantity)
+    {
+        var allocations = new List<(long BatchId, decimal Quantity, decimal ReturnedQuantity)>();
+        using (var query = connection.CreateCommand())
+        {
+            query.Transaction = transaction;
+            query.CommandText = """
+                SELECT SaleItemExpirationBatchAllocations.BatchId,
+                       SaleItemExpirationBatchAllocations.Quantity,
+                       SaleItemExpirationBatchAllocations.ReturnedQuantity
+                FROM SaleItemExpirationBatchAllocations
+                JOIN ProductExpirationBatches ON ProductExpirationBatches.Id = SaleItemExpirationBatchAllocations.BatchId
+                WHERE SaleItemExpirationBatchAllocations.SaleItemId = $saleItemId
+                ORDER BY ProductExpirationBatches.ExpirationDate, ProductExpirationBatches.Id
+                """;
+            query.Parameters.AddWithValue("$saleItemId", saleItemId);
+            using var reader = query.ExecuteReader();
+            while (reader.Read())
+            {
+                allocations.Add((reader.GetInt64(0), ReadDecimal(reader, 1), ReadDecimal(reader, 2)));
+            }
+        }
+
+        var remaining = quantity;
+        foreach (var allocation in allocations)
+        {
+            if (remaining <= 0)
+            {
+                break;
+            }
+
+            var restored = Math.Min(remaining, allocation.Quantity - allocation.ReturnedQuantity);
+            if (restored <= 0)
+            {
+                continue;
+            }
+            using var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = """
+                UPDATE ProductExpirationBatches
+                SET Quantity = Quantity + $quantity
+                WHERE Id = $batchId;
+                UPDATE SaleItemExpirationBatchAllocations
+                SET ReturnedQuantity = ReturnedQuantity + $quantity
+                WHERE SaleItemId = $saleItemId AND BatchId = $batchId
+                """;
+            update.Parameters.AddWithValue("$quantity", restored);
+            update.Parameters.AddWithValue("$batchId", allocation.BatchId);
+            update.Parameters.AddWithValue("$saleItemId", saleItemId);
+            update.ExecuteNonQuery();
+            remaining -= restored;
+        }
     }
 
     private static void RecordStockMovement(SqliteConnection connection, SqliteTransaction transaction, long productId, string productName, string type, decimal quantity, decimal previousStock, decimal newStock, string note)

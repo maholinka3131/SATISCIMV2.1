@@ -28,6 +28,16 @@ public sealed class StockMovement
     public string Username { get; init; } = "";
 }
 
+public sealed class ProductExpirationBatch
+{
+    public long Id { get; init; }
+    public long ProductId { get; init; }
+    public string ProductName { get; init; } = "";
+    public string Barcode { get; init; } = "";
+    public DateTime ExpirationDate { get; init; }
+    public decimal Quantity { get; init; }
+}
+
 public sealed class BestSellingProduct
 {
     public string ProductName { get; init; } = "";
